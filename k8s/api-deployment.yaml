@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/your-org/socialmedia-ai-api:latest
+          image: ghcr.io/web4uai-cpu/socioauto:latest
           ports: [{ containerPort: 8000 }]
           envFrom:
             - secretRef: { name: socialmedia-ai-secrets }
