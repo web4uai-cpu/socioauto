@@ -1,0 +1,5 @@
+- Python uses type hints, `from __future__ import annotations`, concise module/function docstrings.
+- Validate API boundaries with Pydantic; use `Depends` for auth and rate limits.
+- Structured logging comes from `src.logging_config.get_logger`.
+- Do not log or return raw platform credentials; encrypt through `src/security/crypto.py`.
+- Preserve public route contracts and make the smallest local change with a focused pytest check.

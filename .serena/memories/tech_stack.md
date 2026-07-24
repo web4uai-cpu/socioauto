@@ -1,0 +1,3 @@
+- Python 3.14 runtime locally; FastAPI + Pydantic v2; SQLAlchemy 2; pytest; Uvicorn.
+- PostgreSQL 16 and Redis 7 via Docker Compose; SQLite is the local no-Docker default.
+- Frontend is React 18, TypeScript, Vite, Tailwind, Recharts.

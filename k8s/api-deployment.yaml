@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socialmedia-ai-api
+  namespace: socialmedia-ai
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: socialmedia-ai-api }
+  template:
+    metadata:
+      labels: { app: socialmedia-ai-api }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/your-org/socialmedia-ai-api:latest
+          ports: [{ containerPort: 8000 }]
+          envFrom:
+            - secretRef: { name: socialmedia-ai-secrets }
+          readinessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: socialmedia-ai-api
+  namespace: socialmedia-ai
+spec:
+  selector: { app: socialmedia-ai-api }
+  ports: [{ port: 80, targetPort: 8000 }]
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: socialmedia-ai-api-hpa
+  namespace: socialmedia-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: socialmedia-ai-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

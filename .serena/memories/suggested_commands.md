@@ -1,0 +1,4 @@
+- Tests: `C:/Python314/python.exe -m pytest tests/ -q`.
+- Local API: `C:/Python314/python.exe -m uvicorn src.api.main:app --reload`.
+- Compose validation: `docker compose config`; full stack: `docker compose up --build` (requires Docker Desktop Linux engine).
+- PowerShell is the workspace shell.

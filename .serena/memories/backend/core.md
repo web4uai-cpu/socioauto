@@ -1,0 +1,5 @@
+- FastAPI application: `src/api/main.py`; versioned routes: `src/api/routes/`.
+- Route data is still in-memory (`src/api/store.py`); ORM/session foundation exists in `src/db/models.py`, `src/db/session.py`.
+- Local default database is SQLite (`socialmedia.db`, ignored); Compose overrides `DATABASE_URL` for PostgreSQL.
+- JWT auth uses `get_current_user_id`; tier rate limiting is a router dependency. Admin user operations require `require_admin` and `ADMIN_EMAILS`.
+- Never bypass the moderation gate: publishing only accepts `SCHEDULED` content.

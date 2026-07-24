@@ -1,0 +1,3 @@
+- SocialMediaAI backend under `src/`; frontend under `frontend/`; schema/migration under `src/db/` and `db/migrations/`.
+- Agent pipeline is `CampaignState -> CampaignState`; moderation approval is mandatory before scheduling/publishing.
+- Read backend specifics in `mem:backend/core`, technical commands in `mem:suggested_commands`, and code conventions in `mem:conventions`.

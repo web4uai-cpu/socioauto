@@ -1,0 +1,13 @@
+.env
+.env.*
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.db
+socialmedia.db
+alembic_bootstrap.db
+# Real k8s secrets — only the *.example.yaml is committed.
+k8s/secrets.yaml
+frontend/node_modules/
+frontend/dist/

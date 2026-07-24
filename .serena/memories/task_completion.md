@@ -1,0 +1,3 @@
+- Backend code change: run `C:/Python314/python.exe -m pytest tests/ -q`.
+- Check touched Python files with editor diagnostics when available.
+- Container config change: run `docker compose config`; actual container start needs Docker Desktop running.

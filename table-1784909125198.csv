@@ -1,0 +1,4 @@
+﻿File,Location,Description
+**README.md**,`/mnt/agents/output/social_media_ai_agent/README.md`,"Complete project overview, architecture, tech stack, API reference, and getting started guide"
+**SYSTEM\_DESIGN.md**,`/mnt/agents/output/social_media_ai_agent/docs/SYSTEM_DESIGN.md`,"Full system architecture, database schemas, API design, security, scaling strategy"
+**AGENTS.md**,`/mnt/agents/output/social_media_ai_agent/docs/AGENTS.md`,"Detailed specifications for all 8 agents with prompts, configurations, and orchestration"

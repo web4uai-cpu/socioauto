@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socialmedia-ai-worker
+  namespace: socialmedia-ai
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: socialmedia-ai-worker }
+  template:
+    metadata:
+      labels: { app: socialmedia-ai-worker }
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/your-org/socialmedia-ai-api:latest
+          command:
+            - celery
+            - -A
+            - src.orchestrator.tasks.celery_app
+            - worker
+            - --loglevel=info
+            - --queues=orchestrator
+          envFrom:
+            - secretRef: { name: socialmedia-ai-secrets }
+          resources:
+            requests: { cpu: "250m", memory: "256Mi" }
+            limits: { cpu: "1", memory: "512Mi" }
+---
+# Celery beat scheduler — MUST stay a single replica (it is the one source of timed triggers).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socialmedia-ai-beat
+  namespace: socialmedia-ai
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: socialmedia-ai-beat }
+  template:
+    metadata:
+      labels: { app: socialmedia-ai-beat }
+    spec:
+      containers:
+        - name: beat
+          image: ghcr.io/your-org/socialmedia-ai-api:latest
+          command:
+            - celery
+            - -A
+            - src.orchestrator.tasks.celery_app
+            - beat
+            - --loglevel=info
+          envFrom:
+            - secretRef: { name: socialmedia-ai-secrets }
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits: { cpu: "250m", memory: "256Mi" }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: socialmedia-ai-worker-hpa
+  namespace: socialmedia-ai
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: socialmedia-ai-worker
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 75 }
