@@ -12,13 +12,15 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.deps import enforce_rate_limit, get_current_user
 from src.billing.stripe_client import StripeNotConfigured, create_checkout_session
-from src.db.models import User
+from src.db.models import Campaign, User
 from src.db.repositories.billing import invoices_for_user, subscriptions_for_user
 from src.db.session import get_db
+from src.finance.reports import build_revenue_report
 from src.logging_config import get_logger
 from src.platforms.http_client import PlatformHttpError
 from src.runtime_config import get_setting
@@ -62,6 +64,29 @@ def list_invoices(
 ) -> list[InvoiceResponse]:
     """Return invoices belonging to the authenticated user."""
     return [InvoiceResponse(**invoice) for invoice in invoices_for_user(db, current_user.id)]
+
+
+@router.get("/revenue-report")
+def revenue_report(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict:
+    """Revenue, generation cost, and growth insights for the authenticated account.
+
+    Metrics the workflow spec asks for but that cannot be computed — campaign ROI, cost per
+    lead, revenue attribution — are returned under `unavailable` with the reason and what
+    would be needed, rather than estimated from data that does not exist.
+    """
+    campaign_usage = [
+        (state_json or {}).get("usage", {})
+        for state_json in db.execute(
+            select(Campaign.state_json).where(Campaign.user_id == current_user.id)
+        ).scalars()
+    ]
+    return build_revenue_report(
+        subscriptions=subscriptions_for_user(db, current_user.id),
+        invoices=invoices_for_user(db, current_user.id),
+        campaign_usage=[u for u in campaign_usage if u],
+    )
 
 
 class CheckoutRequest(BaseModel):

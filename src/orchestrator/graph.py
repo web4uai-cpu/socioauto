@@ -28,6 +28,7 @@ from src.agents.seo import SEOAgent
 from src.agents.trend_research import TrendResearchAgent
 from src.agents.video import VideoAgent
 from src.agents.visual import VisualAgent
+from src.llm import usage
 from src.logging_config import get_logger
 from src.orchestrator.state import CampaignState
 
@@ -78,9 +79,12 @@ PIPELINE = [
 def _run(agents: list, state: CampaignState, on_agent: ProgressHook | None) -> CampaignState:
     """Run `agents` in order, reporting completion after each.
 
+    Opens a fresh LLM accounting scope so `state.usage` reflects only this run's tokens.
+
     A failing progress hook is logged and ignored — progress reporting must never take a
     campaign down with it.
     """
+    usage.start()
     total = len(agents)
     for index, agent in enumerate(agents, start=1):
         state = agent.run(state)
@@ -90,6 +94,9 @@ def _run(agents: list, state: CampaignState, on_agent: ProgressHook | None) -> C
             on_agent(agent.name, index, total)
         except Exception as exc:  # noqa: BLE001 - telemetry must not break generation
             logger.warning("progress hook failed", extra={"agent": agent.name, "error": str(exc)})
+    # Accumulate, so a regenerated campaign reports what it cost in total rather than only
+    # what the latest re-draft cost.
+    state.usage = usage.merge(state.usage, usage.snapshot())
     return state
 
 

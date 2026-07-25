@@ -180,6 +180,9 @@ class CampaignState:
     analytics: list[dict[str, Any]] = field(default_factory=list)
     # Analytics Agent output: improvement suggestions derived from measured performance.
     recommendations: list[dict[str, Any]] = field(default_factory=list)
+    # LLM tokens spent generating this campaign, and their cost when rates are configured.
+    # This is the measurable half of ROI; the revenue half needs attribution we do not have.
+    usage: dict[str, Any] = field(default_factory=dict)
     log: list[str] = field(default_factory=list)
     # Transient per-platform OAuth access tokens for publishing. Never serialized to the DB
     # (excluded from to_dict/from_dict) so decrypted secrets never touch persistent storage.
@@ -203,6 +206,7 @@ class CampaignState:
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
             "recommendations": list(self.recommendations),
+            "usage": dict(self.usage),
             "log": list(self.log),
         }
 
@@ -222,5 +226,6 @@ class CampaignState:
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),
             recommendations=list(data.get("recommendations", [])),
+            usage=dict(data.get("usage", {})),
             log=list(data.get("log", [])),
         )

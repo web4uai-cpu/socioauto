@@ -13,6 +13,7 @@ import json
 from functools import lru_cache
 from typing import Any, Protocol
 
+from src.llm.usage import record
 from src.logging_config import get_logger
 from src.runtime_config import get_setting
 
@@ -87,6 +88,7 @@ class AnthropicProvider:
         )
 
     def _text(self, response: Any) -> str | None:
+        self._record_usage(response)
         if response.stop_reason == "refusal":
             logger.warning("llm refused request", extra={"model": self._model})
             return None
@@ -94,6 +96,24 @@ class AnthropicProvider:
             if block.type == "text":
                 return block.text.strip()
         return None
+
+    def _record_usage(self, response: Any) -> None:
+        """Book this call's tokens against the active accounting scope.
+
+        A refused or malformed response still consumed input tokens, so usage is recorded
+        before the response is interpreted. Never raises — accounting must not break a
+        campaign.
+        """
+        try:
+            usage = getattr(response, "usage", None)
+            if usage is None:
+                return
+            record(
+                input_tokens=getattr(usage, "input_tokens", 0) or 0,
+                output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            )
+        except Exception as exc:  # noqa: BLE001 - accounting is never fatal
+            logger.warning("usage accounting failed", extra={"error": str(exc)})
 
     def complete(
         self, prompt: str, *, system: str = "", max_tokens: int = DEFAULT_MAX_TOKENS

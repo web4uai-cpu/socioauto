@@ -341,9 +341,37 @@ Processes subscription billing
 Output: Revenue Reports + Growth Insights
 ```
 
-Not yet implemented (Phase 6 of [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md)). Data
-model exists: `subscriptions`/`invoices` in [src/db/models.py](../src/db/models.py); UI stub:
-[FinancialManagement.tsx](../frontend/src/components/FinancialManagement.tsx).
+**Partly implemented.** [src/finance/reports.py](../src/finance/reports.py) builds the report
+from Stripe-fed `subscriptions`/`invoices` plus measured generation cost;
+`GET /api/v1/admin/revenue-report` serves it, and
+[FinancialManagement.tsx](../frontend/src/components/FinancialManagement.tsx) renders it.
+
+| Spec item | Status |
+|---|---|
+| Revenue reports (MRR / ARR, invoices) | ✅ from real subscription + invoice rows |
+| Growth insights | ✅ churn, past-due, recent billing |
+| Generation cost | ✅ exact token counts; dollars only when rates are configured |
+| Processes subscription billing | ✅ existing Stripe Checkout + webhook |
+| **Campaign ROI** | ❌ reported `unavailable` |
+| **Cost per lead** | ❌ reported `unavailable` |
+| **Revenue attribution** | ❌ reported `unavailable` |
+
+### Why three metrics are absent rather than estimated
+
+ROI needs revenue attributed to a campaign, and **nothing links a payment back to the post that
+earned it** — no UTM tagging, no conversion events, no attribution window. Cost per lead needs
+a lead count, and no lead capture exists anywhere in the system (see also Phase 6). Rather than
+divide by an invented number, the report returns each under `unavailable` with the reason and
+exactly what would be needed to compute it.
+
+The **cost** half of ROI is real: `generation_cost` is measured LLM token spend, accumulated
+per campaign in `state.usage` via [src/llm/usage.py](../src/llm/usage.py). Token counts are
+exact. Dollar figures appear **only** when the operator sets `LLM_COST_PER_MTOK_INPUT` /
+`_OUTPUT` in Integrations — we never guess at pricing, and an unpriced run reports `None`
+rather than `0.0`, which would read as "this was free".
+
+Enterprise subscriptions are counted as paying accounts but contribute `0` to MRR, because
+they are contract-priced and assuming a number would fabricate revenue.
 
 ## Error Handling & Recovery
 

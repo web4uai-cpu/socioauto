@@ -55,6 +55,23 @@ SETTING_SPECS: tuple[SettingSpec, ...] = (
         is_secret=False,
         help_text="Defaults to the latest Claude model when blank.",
     ),
+    SettingSpec(
+        "LLM_COST_PER_MTOK_INPUT",
+        "Input cost per million tokens (USD)",
+        "ai",
+        is_secret=False,
+        help_text=(
+            "Your contracted rate. Leave blank and reports show exact token counts but no "
+            "dollar figure — costs are never guessed."
+        ),
+    ),
+    SettingSpec(
+        "LLM_COST_PER_MTOK_OUTPUT",
+        "Output cost per million tokens (USD)",
+        "ai",
+        is_secret=False,
+        help_text="Your contracted rate. Leave blank to omit dollar costs from reports.",
+    ),
     # --- Image generation ------------------------------------------------------------
     SettingSpec(
         "IMAGE_PROVIDER",
