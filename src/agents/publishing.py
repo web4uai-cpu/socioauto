@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from src.agents.base import BaseAgent
 from src.logging_config import get_logger
 from src.orchestrator.state import CampaignState, ContentStatus
+from src.platforms.clients import build_post_url
 from src.platforms.http_client import PlatformHttpError, publish_post
 
 logger = get_logger(__name__)
@@ -37,11 +38,16 @@ class PublishingAgent(BaseAgent):
                 access_token = state.access_tokens.get(item.platform)
                 external_id = publish_post(item.platform, item.body, access_token=access_token)
                 item.external_post_id = external_id
+                item.external_post_url = build_post_url(item.platform, external_id)
                 item.published_at = datetime.now(UTC)
                 item.status = ContentStatus.PUBLISHED
                 logger.info(
                     "post published",
-                    extra={"platform": item.platform, "external_post_id": external_id},
+                    extra={
+                        "platform": item.platform,
+                        "external_post_id": external_id,
+                        "external_post_url": item.external_post_url,
+                    },
                 )
             except PlatformHttpError as exc:
                 item.status = ContentStatus.FAILED

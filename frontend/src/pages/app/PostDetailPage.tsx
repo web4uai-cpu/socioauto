@@ -387,11 +387,23 @@ function PostCard({ item, index, campaignId, onChanged, disabled }: PostCardProp
         )}
 
         {(item.scheduled_at || item.published_at) && (
-          <p className="border-t border-slate-100 pt-3 text-xs text-slate-400">
-            {item.published_at
-              ? `Published ${new Date(item.published_at).toLocaleString()}`
-              : `Scheduled for ${new Date(item.scheduled_at!).toLocaleString()}`}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3 text-xs text-slate-400">
+            <span>
+              {item.published_at
+                ? `Published ${new Date(item.published_at).toLocaleString()}`
+                : `Scheduled for ${new Date(item.scheduled_at!).toLocaleString()}`}
+            </span>
+            {item.external_post_url && (
+              <a
+                href={item.external_post_url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-medium text-brand-600 underline-offset-2 hover:underline"
+              >
+                View post ↗
+              </a>
+            )}
+          </div>
         )}
 
         {error && (

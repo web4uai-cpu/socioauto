@@ -12,6 +12,9 @@ anthropic>=0.116
 # Image generation only (Claude does not generate images). Unused until IMAGE_PROVIDER is set.
 openai>=1.40
 python-dotenv>=1.0
+# IANA timezone database. slim container images ship without one, and zoneinfo would then
+# silently fall back to UTC — putting every scheduled post hours off.
+tzdata>=2024.1
 tenacity>=8.3
 pyjwt>=2.9
 cryptography>=42.0

@@ -73,6 +73,7 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
                 scheduled_at=item.scheduled_at,
                 published_at=item.published_at,
                 external_post_id=item.external_post_id,
+                external_post_url=item.external_post_url,
             )
             for item in record.state.calendar
         ],
@@ -149,6 +150,7 @@ def create_campaign(
         raw_input=req.prompt,
         post_kind=req.post_kind,
         auto_publish=req.auto_publish,
+        timezone=req.timezone,
     )
     state = run_to_moderation(state)
 
@@ -279,6 +281,7 @@ def start_campaign(
         raw_input=req.prompt,
         post_kind=req.post_kind,
         auto_publish=req.auto_publish,
+        timezone=req.timezone,
     )
     record = CampaignRecord(
         id=campaigns_repo.new_id(),

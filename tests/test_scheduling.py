@@ -8,7 +8,12 @@ from fastapi.testclient import TestClient
 from src.agents import scheduling as scheduling_agent
 from src.api.main import app
 from src.orchestrator.state import CampaignState, ContentItem, ContentStatus
-from src.scheduling.optimal_times import next_optimal_slot, optimal_hours
+from src.scheduling.optimal_times import (
+    DEFAULT_TIMEZONE,
+    next_optimal_slot,
+    optimal_hours,
+    resolve_timezone,
+)
 from src.scheduling.runner import publish_due_items
 
 client = TestClient(app)
@@ -23,16 +28,20 @@ def _auth(email: str) -> str:
 
 
 def test_next_optimal_slot_is_future_and_in_preferred_hours():
+    """Preferred hours are audience-local, so the returned UTC slot must be converted back."""
     now = datetime(2026, 7, 24, 3, 0, tzinfo=UTC)  # a Friday, off-peak
     slot = next_optimal_slot("x", now)
     assert slot > now
-    assert slot.hour in optimal_hours("x")
+    assert slot.tzinfo is not None
+    local = slot.astimezone(resolve_timezone(DEFAULT_TIMEZONE))
+    assert local.hour in optimal_hours("x")
 
 
 def test_linkedin_slots_skip_weekends():
     saturday = datetime(2026, 7, 25, 6, 0, tzinfo=UTC)  # Saturday
     slot = next_optimal_slot("linkedin", saturday)
-    assert slot.weekday() < 5  # Mon–Fri only
+    local = slot.astimezone(resolve_timezone(DEFAULT_TIMEZONE))
+    assert local.weekday() < 5  # Mon–Fri only in the audience's own week
 
 
 def test_publish_due_items_only_publishes_due():
@@ -72,7 +81,9 @@ def test_schedule_endpoint_queues_without_publishing():
 def test_due_post_runner_publishes_scheduled_campaign(monkeypatch):
     # Force scheduling to place slots in the past so they are immediately due.
     past = datetime.now(UTC) - timedelta(minutes=1)
-    monkeypatch.setattr(scheduling_agent, "next_optimal_slot", lambda platform, after: past)
+    monkeypatch.setattr(
+        scheduling_agent, "next_optimal_slot", lambda platform, after, timezone=None: past
+    )
 
     headers = {"Authorization": f"Bearer {_auth('due-runner@brand.com')}"}
     created = client.post(

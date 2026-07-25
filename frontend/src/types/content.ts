@@ -82,6 +82,8 @@ export interface ContentItem {
   scheduled_at: string | null;
   published_at: string | null;
   external_post_id: string | null;
+  /** Public permalink; null for simulated posts and platforms whose id has no URL. */
+  external_post_url: string | null;
 }
 
 export interface Campaign {

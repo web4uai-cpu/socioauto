@@ -228,20 +228,41 @@ Captures post IDs and URLs
 Output: PublishedPosts with tracking IDs
 ```
 
-**Scheduling implemented.** [src/scheduling/optimal_times.py](../src/scheduling/optimal_times.py)
-holds ranked preferred hours per platform and `next_optimal_slot()` finds the next one;
-[scheduling.py](../src/agents/scheduling.py) assigns slots with a 2-hour minimum gap per
-platform so a campaign does not burst-post. LinkedIn skips weekends.
+**Scheduling implemented, in the audience's own timezone.**
+[optimal_times.py](../src/scheduling/optimal_times.py) holds the windows above as
+**audience-local** hours; `next_optimal_slot()` converts into `state.timezone`, finds the next
+preferred hour, and returns UTC for storage. So "9 AM" means 9 AM where the audience is, while
+the scheduler and DB stay in UTC.
 
-⚠️ The hours are stored in **UTC**, whereas the windows quoted above read as local time — so
-actual send times differ from the table unless your audience is UTC. Per-audience timezone
-resolution is not implemented.
+| Platform | Local window |
+|---|---|
+| Instagram | 11 AM-1 PM, 7 PM-9 PM |
+| LinkedIn | 8-10 AM, 12-2 PM (weekdays only) |
+| X | 9 AM, 12 PM, 3 PM, 6 PM |
+
+Default timezone is **`Asia/Kolkata`** (IST); override per campaign with `timezone` on the
+create request. Note IST is UTC+05:30, so an on-the-hour local slot is stored on the half hour
+in UTC — that is correct, not a rounding bug. An unknown timezone degrades to the default and
+then to UTC rather than failing the campaign. `tzdata` is a dependency because slim container
+images ship without a system tz database, and zoneinfo would otherwise silently fall back to
+UTC and put every post 5.5 hours out.
+
+[scheduling.py](../src/agents/scheduling.py) assigns slots with a 2-hour minimum gap per
+platform so a campaign does not burst-post.
 
 **Publishing implemented**: [publishing.py](../src/agents/publishing.py) +
 [http_client.py](../src/platforms/http_client.py) (tenacity retry/backoff, circuit breaker),
 and OAuth **is** wired — [src/platforms/oauth/](../src/platforms/oauth/) with
 `GET /api/v1/accounts/{platform}/authorize` and a callback route. Without a connected account
 the publisher runs in **simulate** mode and returns a synthetic `…-sim-…` id.
+
+**Post IDs and URLs are captured.** `external_post_id` always; `external_post_url` via
+`build_post_url()` for platforms whose id maps onto a public permalink (X, LinkedIn, Facebook,
+TikTok). It returns `None` — deliberately, rather than a plausible-looking dead link — for:
+- **simulated posts**, which do not exist;
+- **Instagram**, whose Graph API media id is *not* the `/p/<shortcode>` used in permalinks.
+  Instagram returns a `permalink` field on the media object; capturing that is the correct fix
+  and is not yet wired.
 
 > 🚨 **Scheduled posts do not currently publish in production.** The due-post runner is a
 > Celery beat task and no worker/beat service is deployed — see

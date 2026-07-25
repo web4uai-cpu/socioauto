@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from src.orchestrator.state import DEFAULT_TIMEZONE
+
 POST_KIND_PATTERN = "^(text|image|video|audio|faceless_video)$"
 # Same set, but empty is allowed and means "no preference — decide per platform".
 OPTIONAL_POST_KIND_PATTERN = "^(text|image|video|audio|faceless_video)?$"
@@ -23,6 +25,8 @@ class CampaignCreateRequest(BaseModel):
     # Trusted campaigns skip the *human* review queue and publish once moderation approves.
     # Moderation itself is never skipped.
     auto_publish: bool = False
+    # IANA name (e.g. "America/New_York"). Optimal posting windows are local to this.
+    timezone: str = Field(default=DEFAULT_TIMEZONE, max_length=64)
 
 
 class MediaRef(BaseModel):
@@ -52,6 +56,7 @@ class ContentItemResponse(BaseModel):
     scheduled_at: datetime | None = None
     published_at: datetime | None = None
     external_post_id: str | None = None
+    external_post_url: str | None = None
 
 
 class ManualPostCreateRequest(BaseModel):

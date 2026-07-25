@@ -7,6 +7,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
+# Default audience timezone for scheduling. India has no DST, so local posting windows are
+# stable year-round. Override per campaign with `CampaignState.timezone`.
+DEFAULT_TIMEZONE = "Asia/Kolkata"
+
 
 def _iso(value: datetime | None) -> str | None:
     return value.isoformat() if value is not None else None
@@ -97,6 +101,8 @@ class ContentItem:
     scheduled_at: datetime | None = None
     published_at: datetime | None = None
     external_post_id: str | None = None
+    # Public permalink, when the platform's id maps to one and the post is real.
+    external_post_url: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -119,6 +125,7 @@ class ContentItem:
             "scheduled_at": _iso(self.scheduled_at),
             "published_at": _iso(self.published_at),
             "external_post_id": self.external_post_id,
+            "external_post_url": self.external_post_url,
         }
 
     @classmethod
@@ -143,6 +150,7 @@ class ContentItem:
             scheduled_at=_parse_dt(data.get("scheduled_at")),
             published_at=_parse_dt(data.get("published_at")),
             external_post_id=data.get("external_post_id"),
+            external_post_url=data.get("external_post_url"),
         )
 
 
@@ -160,6 +168,8 @@ class CampaignState:
     post_kind: str = ""
     # Research Agent output: keywords, hashtags, pain points, competitors, sources.
     research: dict[str, Any] = field(default_factory=dict)
+    # IANA timezone the audience lives in; optimal posting windows are local to it.
+    timezone: str = DEFAULT_TIMEZONE
     trends: list[dict[str, Any]] = field(default_factory=list)
     calendar: list[ContentItem] = field(default_factory=list)
     analytics: list[dict[str, Any]] = field(default_factory=list)
@@ -181,6 +191,7 @@ class CampaignState:
             "brief": dict(self.brief),
             "post_kind": self.post_kind,
             "research": dict(self.research),
+            "timezone": self.timezone,
             "trends": self.trends,
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
@@ -198,6 +209,7 @@ class CampaignState:
             brief=dict(data.get("brief", {})),
             post_kind=data.get("post_kind", ""),
             research=dict(data.get("research", {})),
+            timezone=data.get("timezone", "UTC"),
             trends=data.get("trends", []),
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),

@@ -61,6 +61,33 @@ _ENDPOINTS: dict[str, _Endpoint] = {
 }
 
 
+# Permalink templates for platforms whose post id maps directly onto a public URL.
+#
+# Instagram is deliberately absent: its Graph API media id is *not* the /p/<shortcode> used in
+# permalinks, so building a URL from the id would produce a dead link. Instagram returns a
+# `permalink` field on the media object — capture that rather than guessing.
+_PERMALINKS: dict[str, str] = {
+    "x": "https://x.com/i/web/status/{id}",
+    "linkedin": "https://www.linkedin.com/feed/update/{id}",
+    "facebook": "https://www.facebook.com/{id}",
+    "tiktok": "https://www.tiktok.com/video/{id}",
+}
+# Marker used by simulate-mode ids; those posts do not exist, so they get no URL.
+_SIMULATED = "-sim-"
+
+
+def build_post_url(platform: str, external_id: str | None) -> str | None:
+    """Return the public URL for a published post, or None when one cannot be known.
+
+    Returns None for simulated posts and for platforms whose id does not map to a URL —
+    handing back a plausible-looking dead link would be worse than returning nothing.
+    """
+    if not external_id or _SIMULATED in external_id:
+        return None
+    template = _PERMALINKS.get(platform)
+    return template.format(id=external_id) if template else None
+
+
 class RestPlatformClient:
     """Config-driven REST client covering all supported platforms."""
 
