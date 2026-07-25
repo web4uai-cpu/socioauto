@@ -8,6 +8,25 @@
 | Frontend (admin dashboard) | Static host (Vercel/Netlify/Railway) | set via `VITE_API_BASE_URL` |
 | Postgres + Redis | Railway plugins (or the `k8s/` manifests) | private network URLs |
 
+## 0. Deploying with the Railway CLI
+
+The backend lives in the Railway project **`aware-adaptation`** as the service
+**`socioauto`** (alongside its Postgres and Redis plugins).
+
+```bash
+railway login
+railway link -p aware-adaptation -e production -s socioauto
+railway up --ci
+```
+
+`.railwayignore` keeps `.venv/` and `frontend/node_modules/` out of the upload — without it
+the CLI ships ~200 MB the image never uses.
+
+The image is built from the repo `Dockerfile`, which copies only `src/` and `db/`. Alembic
+is therefore *not* in the container: new tables are created by `Base.metadata.create_all()`
+at startup. That is fine for additive changes, but a destructive migration must be run
+against the database separately before deploying.
+
 ## 1. Backend configuration
 
 Only five values *must* come from the environment. Everything else can be entered later in
@@ -27,6 +46,27 @@ Generate the two secrets:
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"                 # JWT_SECRET_KEY
 python -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())"  # APP_ENCRYPTION_KEY
+```
+
+> **These are not optional.** With `JWT_SECRET_KEY` unset the app falls back to the literal
+> string in `src/security/auth.py`, which is public in this repo — anyone can then forge a
+> valid token for any account. With `ADMIN_EMAILS` unset it defaults to `demo@brand.com`, so
+> a forged token for that address gets admin. `APP_ENV=production` is what turns on the
+> fail-fast guard that refuses to boot in this state; leaving it unset silently disables the
+> check. Set all four together.
+>
+> Rotating `APP_ENCRYPTION_KEY` later makes every stored platform token undecryptable —
+> users must reconnect their social accounts. Rotating `JWT_SECRET_KEY` only invalidates
+> live sessions.
+
+Set them on the service without triggering a redeploy per variable:
+
+```bash
+railway variables --skip-deploys \
+  --set "APP_ENV=production" \
+  --set "JWT_SECRET_KEY=..." \
+  --set "APP_ENCRYPTION_KEY=..." \
+  --set "ADMIN_EMAILS=you@yourdomain.com"
 ```
 
 Also set on Railway:
