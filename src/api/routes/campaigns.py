@@ -44,6 +44,7 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
         cta=record.cta,
         target_audience=record.target_audience,
         status=record.status,
+        research=record.state.research,
         calendar=[
             ContentItemResponse(
                 platform=item.platform,

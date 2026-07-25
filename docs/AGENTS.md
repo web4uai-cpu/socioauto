@@ -66,12 +66,21 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Fallback**: keyword-cue intent classification + first-sentence topic extraction.
 - **No-op**: leaves state untouched when `raw_input` is empty (manual posts).
 
-## 2. Trend Research Agent
-- **Role**: Discover trending topics/hashtags relevant to brand niche.
-- **Tools**: platform trends APIs, news RSS, Google Trends (optional), web search
-- **Prompt summary**: "Given brand niche `{niche}` and target platforms `{platforms}`, return
-  the top 10 trends with a relevance score 0-1 and a one-line rationale."
-- **Output schema**: `List[{topic, score, source, rationale}]`
+## 2. Research Agent (`trend-research`)
+- **File**: `src/agents/trend_research.py`
+- **Role**: Build the campaign's research report — trends, keywords, hashtags, pain points.
+- **Output**: `state.trends` = `List[{topic, score, source, rationale}]` (≤ `MAX_TRENDS`), plus
+  `state.research` = `{keywords[{term, intent, rationale}], hashtags[], pain_points[],
+  competitors[], search_volumes[], source}`.
+- **Caller data wins**: supplied trends are never overwritten; the rest of the report is still
+  derived from them.
+- **Consumed by**: the SEO Agent, which prefers these keywords/hashtags over deriving its own.
+- **Honesty constraint**: no live data source is wired up, so the agent must never invent
+  search volumes, follower counts, or competitor metrics. `competitors` and `search_volumes`
+  stay empty, and `pain_points` is empty rather than guessed when no LLM is configured.
+  `source` records `llm` vs `fallback`.
+- **Not implemented**: web scraping, Google Trends, competitor analysis, sentiment analysis —
+  see [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) Phase 2.
 
 ## 3. Content Strategy Agent
 - **Role**: Convert trends + brand voice guidelines into a content calendar (topic, platform,

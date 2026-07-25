@@ -119,15 +119,20 @@ class SEOAgent(BaseAgent):
         for item in state.calendar:
             if item.seo:
                 continue
-            seo = self._optimize_with_llm(provider, state, item) or self._fallback(item)
+            seo = self._optimize_with_llm(provider, state, item) or self._fallback(state, item)
             seo["slug"] = _slugify(seo.get("primary_keyword") or item.topic)
             seo["meta_description"] = seo.get("meta_description", "")[:META_DESCRIPTION_LIMIT]
             item.seo = seo
 
-            # Merge SEO hashtags with the content agent's, dedupe, and cap per platform.
+            # Merge the content agent's hashtags, the SEO agent's, and the campaign-level
+            # research set — in that order of specificity — then cap per platform.
             limit = PLATFORM_HASHTAG_LIMIT.get(item.platform, DEFAULT_HASHTAG_LIMIT)
             merged = list(
-                dict.fromkeys(item.hashtags + [t.lstrip("#") for t in seo.get("hashtags", [])])
+                dict.fromkeys(
+                    item.hashtags
+                    + [t.lstrip("#") for t in seo.get("hashtags", [])]
+                    + self._research_hashtags(state)
+                )
             )
             item.hashtags = [t for t in merged if t][:limit]
             optimized += 1
@@ -135,19 +140,35 @@ class SEOAgent(BaseAgent):
         state.note(f"[{self.name}] optimized {optimized} items")
         return state
 
+    def _research_keywords(self, state: CampaignState) -> list[str]:
+        """Keyword terms the Research Agent found for this campaign."""
+        return [
+            entry["term"]
+            for entry in state.research.get("keywords", [])
+            if isinstance(entry, dict) and entry.get("term")
+        ]
+
+    def _research_hashtags(self, state: CampaignState) -> list[str]:
+        return [tag for tag in state.research.get("hashtags", []) if tag]
+
     def _optimize_with_llm(self, provider, state: CampaignState, item: ContentItem) -> dict | None:
         goal = state.brief.get("goal", "grow reach")
         audience = state.brief.get("target_audience") or state.voice_guidelines.get(
             "audience", "the brand's audience"
         )
         tag_limit = PLATFORM_HASHTAG_LIMIT.get(item.platform, DEFAULT_HASHTAG_LIMIT)
+        researched = self._research_keywords(state)
+        pain_points = state.research.get("pain_points", [])
         prompt = (
             f"Brand: {state.brand_name}\n"
             f"Platform: {item.platform}\n"
             f"Campaign goal: {goal}\n"
             f"Target audience: {audience}\n"
             f"Post body: {item.body}\n"
-            f"Current hashtags: {', '.join(item.hashtags) or 'none'}\n\n"
+            f"Current hashtags: {', '.join(item.hashtags) or 'none'}\n"
+            f"Researched keywords: {', '.join(researched) or 'none'}\n"
+            f"Audience pain points: {'; '.join(pain_points) or 'none'}\n\n"
+            "Prefer the researched keywords where they fit this post naturally. "
             f"Return SEO metadata. Meta description must be under {META_DESCRIPTION_LIMIT} "
             f"characters. Suggest at most {tag_limit} hashtags."
         )
@@ -157,12 +178,20 @@ class SEOAgent(BaseAgent):
         result["source"] = provider.name
         return result
 
-    def _fallback(self, item: ContentItem) -> dict:
-        """Frequency-based keyword extraction, used when no LLM is configured."""
-        words = [
-            w for w in re.findall(r"[a-z][a-z0-9']+", item.topic.lower()) if w not in _STOPWORDS
-        ]
-        keywords = list(dict.fromkeys(words))[:6]
+    def _fallback(self, state: CampaignState, item: ContentItem) -> dict:
+        """Used when no LLM is configured.
+
+        Prefers the Research Agent's keywords that actually appear in this post, so the
+        campaign-level research still drives per-item SEO; falls back to extracting from the
+        topic when research produced nothing relevant.
+        """
+        haystack = f"{item.topic} {item.body}".lower()
+        keywords = [term for term in self._research_keywords(state) if term in haystack][:6]
+        if not keywords:
+            words = [
+                w for w in re.findall(r"[a-z][a-z0-9']+", item.topic.lower()) if w not in _STOPWORDS
+            ]
+            keywords = list(dict.fromkeys(words))[:6]
         primary = keywords[0] if keywords else item.topic.lower()[:40]
         body = item.body or item.topic
         return {

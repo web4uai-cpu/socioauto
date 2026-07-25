@@ -86,6 +86,8 @@ class CampaignResponse(BaseModel):
     target_audience: str | None
     status: str
     calendar: list[ContentItemResponse]
+    # Research Agent report: keywords, hashtags, pain points. Empty for manual posts.
+    research: dict = {}
 
 
 class ApproveResponse(BaseModel):

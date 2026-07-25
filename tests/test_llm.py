@@ -79,9 +79,7 @@ def test_content_creation_uses_llm_draft(monkeypatch):
 
 
 def test_content_creation_truncates_to_platform_limit(monkeypatch):
-    stub = StubProvider(
-        payload={"body": "x" * 400, "hashtags": [], "media_brief": "", "cta": ""}
-    )
+    stub = StubProvider(payload={"body": "x" * 400, "hashtags": [], "media_brief": "", "cta": ""})
     monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"])
@@ -119,14 +117,22 @@ def test_trend_research_populates_trends(monkeypatch):
 
 
 def test_trend_research_keeps_caller_supplied_trends(monkeypatch):
-    stub = StubProvider(payload={"trends": [{"topic": "generated"}]})
+    """Supplied trends are never overwritten, but the rest of the report is still researched.
+
+    The agent now also produces keywords/hashtags/pain points, so it consults the LLM even
+    when trends are given — passing the supplied topics in rather than inventing new ones.
+    """
+    stub = StubProvider(
+        payload={"trends": [{"topic": "generated"}], "keywords": [], "hashtags": []}
+    )
     monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"], trends=[{"topic": "supplied"}])
     TrendResearchAgent().run(state)
 
     assert [t["topic"] for t in state.trends] == ["supplied"]
-    assert stub.prompts == []  # LLM not consulted
+    # The supplied topic is what the research prompt was anchored to.
+    assert "supplied" in stub.prompts[0]
 
 
 def test_content_strategy_drops_unknown_platforms(monkeypatch):
@@ -140,9 +146,7 @@ def test_content_strategy_drops_unknown_platforms(monkeypatch):
     )
     monkeypatch.setattr("src.agents.content_strategy.get_provider", lambda: stub)
 
-    state = CampaignState(
-        brand_name="Acme", platforms=["x"], trends=[{"topic": "AI triage"}]
-    )
+    state = CampaignState(brand_name="Acme", platforms=["x"], trends=[{"topic": "AI triage"}])
     ContentStrategyAgent().run(state)
 
     assert [i.platform for i in state.calendar] == ["x"]

@@ -58,9 +58,35 @@ Output: ResearchReport with:
   Audience pain points
 ```
 
-Baseline today: [src/agents/trend_research.py](../src/agents/trend_research.py) returns
-`{topic, score, source, rationale}` per trend; web scraping/Google Trends/competitor analysis
-are not yet wired up (see [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md) Phase 2).
+**Partly implemented.** [src/agents/trend_research.py](../src/agents/trend_research.py) builds
+the report into `state.research`, exposed on the campaign API as `research`.
+
+| Spec output | Status |
+|---|---|
+| Top 10 trending topics | ✅ `state.trends`, capped at `MAX_TRENDS` |
+| 20 high-value keywords | ✅ `research["keywords"]` — `{term, intent, rationale}`, capped at `TARGET_KEYWORDS` |
+| 15-20 optimized hashtags | ✅ `research["hashtags"]` — deduped, `#` stripped, capped at `MAX_HASHTAGS` |
+| Audience pain points | ✅ `research["pain_points"]` (LLM only — see below) |
+| Competitor post analysis | ❌ `research["competitors"]` stays `[]` |
+
+| Spec activity | Status |
+|---|---|
+| Web scraping for trending topics | ❌ not implemented |
+| Keyword research (Google Trends API) | ❌ no trends API; keywords are LLM-derived or extracted from the brief |
+| Hashtag analysis | ⚠️ hashtags are generated, not ranked against real reach data |
+| Competitor analysis on social platforms | ❌ not implemented |
+| Audience sentiment analysis | ❌ needs historical engagement; the Engagement Agent has inbound data but it is not fed back here |
+
+**Everything here is derived, not measured.** There is no live data source, so the agent is
+explicitly forbidden from inventing search volumes, follower counts, or competitor metrics —
+`competitors` and `search_volumes` stay empty rather than being filled with plausible fiction,
+and `pain_points` is empty (not guessed) when no LLM is configured. `research["source"]` records
+whether the report came from the LLM or the deterministic fallback.
+
+**Handoff:** the SEO Agent consumes `research["keywords"]` and `research["hashtags"]` rather
+than re-deriving its own, so Phase 2 actually drives Phase 3. Caller-supplied trends are never
+overwritten — an integration with real trend data can inject it and still get the rest derived
+from it.
 
 ### Phase 3: CONTENT GENERATION (3-7 minutes)
 

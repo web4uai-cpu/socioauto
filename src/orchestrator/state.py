@@ -153,6 +153,8 @@ class CampaignState:
     brief: dict[str, Any] = field(default_factory=dict)
     # Caller-requested post kind applied to every item; blank means decide per platform.
     post_kind: str = ""
+    # Research Agent output: keywords, hashtags, pain points, competitors, sources.
+    research: dict[str, Any] = field(default_factory=dict)
     trends: list[dict[str, Any]] = field(default_factory=list)
     calendar: list[ContentItem] = field(default_factory=list)
     analytics: list[dict[str, Any]] = field(default_factory=list)
@@ -173,6 +175,7 @@ class CampaignState:
             "raw_input": self.raw_input,
             "brief": dict(self.brief),
             "post_kind": self.post_kind,
+            "research": dict(self.research),
             "trends": self.trends,
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
@@ -189,6 +192,7 @@ class CampaignState:
             raw_input=data.get("raw_input", ""),
             brief=dict(data.get("brief", {})),
             post_kind=data.get("post_kind", ""),
+            research=dict(data.get("research", {})),
             trends=data.get("trends", []),
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),
