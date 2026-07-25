@@ -191,9 +191,20 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Output schema**: `{engagement_id, draft_response, escalated: bool}`
 
 ## Analytics Agent (feedback loop)
-- **Role**: Periodically pulls impressions/likes/shares/comments per published item, stores
-  snapshots, and feeds aggregated performance back into the Content Strategy Agent's next cycle
-  (best-performing topics/formats get prioritized).
+- **File**: `src/agents/analytics.py`
+- **Role**: Pulls impressions/likes/shares/comments (and clicks where reported) per published
+  item via `fetch_metrics`, stores them on `item.metrics`, appends a snapshot to
+  `state.analytics`, and generates `state.recommendations`.
+- **Insights**: [src/analytics/insights.py](../src/analytics/insights.py) — engagement rate,
+  CTR, and best-vs-worst comparisons by platform / post kind / publish hour.
+- **Honesty constraints**: comparative advice requires a minimum sample per group and a
+  meaningful gap; simulated and all-zero metric responses are not recorded as data; CTR is
+  `None` rather than `0` when no platform reported clicks. See
+  [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) Phase 6.
+- **Never fatal**: a metrics fetch failure is logged and skipped — analytics is read-only
+  feedback and must not take a campaign down.
+- **Not implemented**: lead-generation tracking, and SEO monitoring (organic growth, search
+  rankings, backlinks) which needs Search Console or an SEO vendor API.
 
 ## Orchestration Loop (pseudocode)
 

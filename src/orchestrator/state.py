@@ -103,6 +103,9 @@ class ContentItem:
     external_post_id: str | None = None
     # Public permalink, when the platform's id maps to one and the post is real.
     external_post_url: str | None = None
+    # Latest performance snapshot pulled from the platform: impressions/likes/shares/comments,
+    # plus clicks where the platform reports them. Empty until a post is live and measured.
+    metrics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -126,6 +129,7 @@ class ContentItem:
             "published_at": _iso(self.published_at),
             "external_post_id": self.external_post_id,
             "external_post_url": self.external_post_url,
+            "metrics": dict(self.metrics),
         }
 
     @classmethod
@@ -151,6 +155,7 @@ class ContentItem:
             published_at=_parse_dt(data.get("published_at")),
             external_post_id=data.get("external_post_id"),
             external_post_url=data.get("external_post_url"),
+            metrics=dict(data.get("metrics", {})),
         )
 
 
@@ -173,6 +178,8 @@ class CampaignState:
     trends: list[dict[str, Any]] = field(default_factory=list)
     calendar: list[ContentItem] = field(default_factory=list)
     analytics: list[dict[str, Any]] = field(default_factory=list)
+    # Analytics Agent output: improvement suggestions derived from measured performance.
+    recommendations: list[dict[str, Any]] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
     # Transient per-platform OAuth access tokens for publishing. Never serialized to the DB
     # (excluded from to_dict/from_dict) so decrypted secrets never touch persistent storage.
@@ -195,6 +202,7 @@ class CampaignState:
             "trends": self.trends,
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
+            "recommendations": list(self.recommendations),
             "log": list(self.log),
         }
 
@@ -213,5 +221,6 @@ class CampaignState:
             trends=data.get("trends", []),
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),
+            recommendations=list(data.get("recommendations", [])),
             log=list(data.get("log", [])),
         )

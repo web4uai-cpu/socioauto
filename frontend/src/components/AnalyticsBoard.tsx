@@ -15,13 +15,34 @@ import { Card, CardBody, CardHeader } from "./ui/Card";
 import { StatCard } from "./ui/StatCard";
 import { ChartIcon, StackIcon, SparkleIcon, CalendarIcon } from "./ui/Icon";
 
+interface Recommendation {
+  type: string;
+  message: string;
+  evidence: Record<string, unknown>;
+}
+
 interface DashboardMetrics {
   total_campaigns: number;
   total_posts: number;
   published_posts: number;
   pending_moderation: number;
   rejected_posts: number;
+  posts_measured: number;
+  impressions: number;
+  likes: number;
+  shares: number;
+  comments: number;
+  engagement_rate: number | null;
+  clicks: number | null;
+  click_through_rate: number | null;
+  recommendations: Recommendation[];
 }
+
+const pct = (value: number | null) =>
+  value === null ? "—" : `${(value * 100).toFixed(1)}%`;
+
+/** Notes explaining absent data, rather than actionable advice. */
+const INFO_TYPES = new Set(["no_data", "no_click_data", "insufficient_sample"]);
 
 /**
  * Pipeline outcome is a *status* encoding, not a series encoding — so each bar wears a
@@ -118,6 +139,82 @@ export function AnalyticsBoard() {
           />
         </div>
       </div>
+
+      {/* Engagement rollup — only meaningful once posts are live on a connected account. */}
+      <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div style={{ ["--i" as string]: 0 }}>
+          <StatCard
+            label="Impressions"
+            value={(metrics?.impressions ?? 0).toLocaleString()}
+            hint={`${metrics?.posts_measured ?? 0} posts measured`}
+            tone="from-brand-400 to-brand-600"
+            loading={loading}
+          />
+        </div>
+        <div style={{ ["--i" as string]: 1 }}>
+          <StatCard
+            label="Engagements"
+            value={(
+              (metrics?.likes ?? 0) +
+              (metrics?.shares ?? 0) +
+              (metrics?.comments ?? 0)
+            ).toLocaleString()}
+            hint="Likes + shares + comments"
+            tone="from-series-2 to-orange-600"
+            loading={loading}
+          />
+        </div>
+        <div style={{ ["--i" as string]: 2 }}>
+          <StatCard
+            label="Engagement rate"
+            value={pct(metrics?.engagement_rate ?? null)}
+            hint="Engagements ÷ impressions"
+            tone="from-series-3 to-emerald-700"
+            loading={loading}
+          />
+        </div>
+        <div style={{ ["--i" as string]: 3 }}>
+          <StatCard
+            label="Click-through"
+            value={pct(metrics?.click_through_rate ?? null)}
+            hint={
+              metrics?.click_through_rate === null
+                ? "No platform reported clicks"
+                : "Clicks ÷ impressions"
+            }
+            tone="from-violet-400 to-violet-600"
+            loading={loading}
+          />
+        </div>
+      </div>
+
+      {metrics?.recommendations?.length ? (
+        <Card>
+          <CardHeader
+            title="Recommendations"
+            subtitle="Derived from measured performance"
+            icon={<SparkleIcon className="h-5 w-5" />}
+          />
+          <CardBody>
+            <ul className="space-y-2">
+              {metrics.recommendations.map((rec, i) => {
+                const info = INFO_TYPES.has(rec.type);
+                return (
+                  <li
+                    key={i}
+                    className={`flex gap-3 rounded-xl p-3 text-sm ${
+                      info ? "bg-slate-50 text-slate-500" : "bg-brand-50 text-brand-900"
+                    }`}
+                  >
+                    <span aria-hidden>{info ? "ℹ" : "→"}</span>
+                    <span>{rec.message}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader

@@ -127,12 +127,30 @@ class ApproveResponse(BaseModel):
     calendar: list[ContentItemResponse]
 
 
+class Recommendation(BaseModel):
+    type: str
+    message: str
+    evidence: dict = {}
+
+
 class AnalyticsDashboardResponse(BaseModel):
     total_campaigns: int
     total_posts: int
     published_posts: int
     pending_moderation: int
     rejected_posts: int
+    # Engagement rollup across measured posts. Counts stay 0 and rates None until posts are
+    # live on a connected account — simulated posts return no metrics.
+    posts_measured: int = 0
+    impressions: int = 0
+    likes: int = 0
+    shares: int = 0
+    comments: int = 0
+    engagement_rate: float | None = None
+    # None (not 0) when no platform reported click counts.
+    clicks: int | None = None
+    click_through_rate: float | None = None
+    recommendations: list[Recommendation] = []
 
 
 class AccountConnectRequest(BaseModel):

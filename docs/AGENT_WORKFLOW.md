@@ -288,9 +288,43 @@ Generates suggestions for improvement
 Output: Performance Dashboard + Recommendations
 ```
 
-Baseline today: [src/agents/analytics.py](../src/agents/analytics.py) records a published-count
-snapshot; per-post engagement pulls and SEO monitoring are Phase 5 work. UI:
+**Analytics implemented.** [analytics.py](../src/agents/analytics.py) now pulls each published
+post's metrics via `RestPlatformClient.fetch_metrics`, stores them on `item.metrics`, appends a
+snapshot to `state.analytics`, and writes improvement suggestions to `state.recommendations`.
+Rollups and recommendations surface on `GET /api/v1/analytics/dashboard` and in
 [AnalyticsBoard.tsx](../frontend/src/components/AnalyticsBoard.tsx).
+
+| Spec item | Status |
+|---|---|
+| Engagement (likes, comments, shares) | ✅ per post and aggregated |
+| Reach and impressions | ✅ |
+| Click-through rates | ⚠️ computed **only** when the platform reports clicks; otherwise `None`, never 0 |
+| Lead generation | ❌ no conversion tracking exists — nothing to measure |
+| Organic growth / search rankings / backlinks | ❌ needs Search Console or an SEO vendor API; not wired |
+| Suggestions for improvement | ✅ [src/analytics/insights.py](../src/analytics/insights.py) |
+| Performance dashboard | ✅ |
+
+### What the recommendation engine will and will not say
+
+Two rules keep it from manufacturing insight:
+
+- **No advice from a sample of one.** A comparative claim needs `MIN_POSTS_PER_GROUP` posts in
+  each of `MIN_GROUPS_FOR_COMPARISON` groups, and a gap of at least `MIN_MEANINGFUL_GAP`.
+  Below that it says so, rather than declaring a winner from noise.
+- **Absent data stays absent.** Simulated posts and all-zero metric responses are *not*
+  recorded — zeros are indistinguishable from "not measured yet" and would drag every average
+  toward zero. With nothing measured the dashboard says "no performance data yet" instead of
+  showing a confident 0%.
+
+Metrics failures are swallowed and logged: analytics is a read-only feedback loop, so an
+outage should cost insight, not the campaign.
+
+> ⚠️ **The `analytics` table is unused, deliberately.** `_project_posts` deletes and re-creates
+> every `Post` row on each campaign save, and `Analytics.post_id` cascades — so snapshots
+> written there would be destroyed by the next write, despite the table being documented
+> append-only. Snapshots therefore live in the campaign's `state_json`. Using the table
+> properly requires stable post identity (match on `external_post_id` and upsert instead of
+> rebuilding the projection).
 
 ### Phase 7: REVENUE & REPORTING (Weekly/Monthly)
 
