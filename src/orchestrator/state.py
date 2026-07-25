@@ -16,6 +16,48 @@ def _parse_dt(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value) if value else None
 
 
+class PostKind(str, Enum):
+    """What medium a post is, which decides how it is produced.
+
+    Gates the generation agents: `TEXT` runs none of them, `AUDIO` produces a voiceover with
+    no video, and `FACELESS_VIDEO` is a video with narration but no on-camera presenter.
+    """
+
+    TEXT = "text"
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    FACELESS_VIDEO = "faceless_video"
+
+
+# Kinds each generation agent applies to.
+VISUAL_KINDS = frozenset({PostKind.IMAGE, PostKind.VIDEO, PostKind.AUDIO, PostKind.FACELESS_VIDEO})
+VIDEO_KINDS = frozenset({PostKind.VIDEO, PostKind.FACELESS_VIDEO})
+AUDIO_KINDS = frozenset({PostKind.AUDIO, PostKind.VIDEO, PostKind.FACELESS_VIDEO})
+
+# What a platform gets when the caller expressed no preference. Keeps prior behaviour:
+# TikTok is a video-first surface, everything else defaults to an image post.
+DEFAULT_KIND_BY_PLATFORM: dict[str, PostKind] = {"tiktok": PostKind.VIDEO}
+FALLBACK_KIND = PostKind.IMAGE
+
+
+def resolve_kind(requested: str | PostKind | None, platform: str) -> PostKind:
+    """Resolve the post kind for one item.
+
+    Precedence: an explicit caller/model choice wins; otherwise fall back to the platform's
+    default. An unrecognised value is treated as "no preference" rather than raising, so a
+    bad LLM response degrades instead of failing the campaign.
+    """
+    if isinstance(requested, PostKind):
+        return requested
+    if requested:
+        try:
+            return PostKind(str(requested).strip().lower())
+        except ValueError:
+            pass
+    return DEFAULT_KIND_BY_PLATFORM.get(platform, FALLBACK_KIND)
+
+
 class ContentStatus(str, Enum):
     DRAFT = "draft"
     PENDING_MODERATION = "pending_moderation"
@@ -31,6 +73,10 @@ class ContentItem:
     platform: str
     topic: str
     body: str = ""
+    # Medium of this post; decides which generation agents run for it.
+    kind: PostKind = PostKind.IMAGE
+    # Strategy goal for this item: awareness | engagement | conversion.
+    goal: str = ""
     hashtags: list[str] = field(default_factory=list)
     media_brief: str = ""
     media: list[dict[str, str]] = field(default_factory=list)
@@ -39,6 +85,8 @@ class ContentItem:
     visual: dict[str, Any] = field(default_factory=dict)
     # Video Agent: script, scene beats, and thumbnail prompt for video-capable platforms.
     video: dict[str, Any] = field(default_factory=dict)
+    # Audio Agent: voiceover script, voice spec, transcript, and duration estimate.
+    audio: dict[str, Any] = field(default_factory=dict)
     # SEO Agent: keywords, meta description, slug, and lead-generation CTA.
     seo: dict[str, Any] = field(default_factory=dict)
     status: ContentStatus = ContentStatus.DRAFT
@@ -52,12 +100,15 @@ class ContentItem:
             "platform": self.platform,
             "topic": self.topic,
             "body": self.body,
+            "kind": self.kind.value,
+            "goal": self.goal,
             "hashtags": list(self.hashtags),
             "media_brief": self.media_brief,
             "media": list(self.media),
             "cta": self.cta,
             "visual": dict(self.visual),
             "video": dict(self.video),
+            "audio": dict(self.audio),
             "seo": dict(self.seo),
             "status": self.status.value,
             "moderation_reasons": list(self.moderation_reasons),
@@ -72,12 +123,15 @@ class ContentItem:
             platform=data["platform"],
             topic=data.get("topic", ""),
             body=data.get("body", ""),
+            kind=PostKind(data.get("kind", PostKind.IMAGE.value)),
+            goal=data.get("goal", ""),
             hashtags=list(data.get("hashtags", [])),
             media_brief=data.get("media_brief", ""),
             media=list(data.get("media", [])),
             cta=data.get("cta", ""),
             visual=dict(data.get("visual", {})),
             video=dict(data.get("video", {})),
+            audio=dict(data.get("audio", {})),
             seo=dict(data.get("seo", {})),
             status=ContentStatus(data.get("status", "draft")),
             moderation_reasons=list(data.get("moderation_reasons", [])),
@@ -97,6 +151,8 @@ class CampaignState:
     raw_input: str = ""
     # Input Parser output: intent, goal, audience, tone, topic, constraints.
     brief: dict[str, Any] = field(default_factory=dict)
+    # Caller-requested post kind applied to every item; blank means decide per platform.
+    post_kind: str = ""
     trends: list[dict[str, Any]] = field(default_factory=list)
     calendar: list[ContentItem] = field(default_factory=list)
     analytics: list[dict[str, Any]] = field(default_factory=list)
@@ -116,6 +172,7 @@ class CampaignState:
             "platforms": list(self.platforms),
             "raw_input": self.raw_input,
             "brief": dict(self.brief),
+            "post_kind": self.post_kind,
             "trends": self.trends,
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
@@ -131,6 +188,7 @@ class CampaignState:
             platforms=list(data.get("platforms", [])),
             raw_input=data.get("raw_input", ""),
             brief=dict(data.get("brief", {})),
+            post_kind=data.get("post_kind", ""),
             trends=data.get("trends", []),
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),

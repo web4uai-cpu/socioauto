@@ -102,11 +102,51 @@ export function PostDetailPage() {
   );
 }
 
+const KIND_LABEL: Record<string, string> = {
+  text: "Text only",
+  image: "Image",
+  video: "Video",
+  audio: "Audio only",
+  faceless_video: "Faceless video",
+};
+
+/** Collapsible block for one agent's output — collapsed by default to keep the card scannable. */
+function Detail({
+  title,
+  meta,
+  children,
+}: {
+  title: string;
+  meta?: (string | null | undefined)[];
+  children: React.ReactNode;
+}) {
+  const parts = (meta ?? []).filter(Boolean);
+  return (
+    <details className="group rounded-xl border border-slate-200 open:bg-slate-50/60">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-sm font-medium text-slate-700">
+        <span className="flex items-center gap-2">
+          {title}
+          {parts.length > 0 && (
+            <span className="text-xs font-normal text-slate-400">{parts.join(" · ")}</span>
+          )}
+        </span>
+        <span className="text-slate-400 transition-transform duration-200 group-open:rotate-90">
+          ›
+        </span>
+      </summary>
+      <div className="border-t border-slate-200 px-3 py-2.5 text-sm text-slate-600">
+        {children}
+      </div>
+    </details>
+  );
+}
+
 function PostCard({ item }: { item: ContentItem }) {
   return (
     <Card className="h-full">
       <CardHeader
         title={<span className="capitalize">{item.platform}</span>}
+        subtitle={KIND_LABEL[item.kind] ?? item.kind}
         action={<PostStatusBadge status={item.status} />}
       />
       <CardBody className="space-y-4">
@@ -134,6 +174,80 @@ function PostCard({ item }: { item: ContentItem }) {
               </div>
             ))}
           </div>
+        )}
+
+        {item.hashtags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {item.hashtags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700"
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* What the generation agents produced for this item. */}
+        {item.audio?.script && (
+          <Detail
+            title="Voiceover"
+            meta={[
+              item.audio.audio_type?.replace(/_/g, " "),
+              item.audio.estimated_seconds ? `~${item.audio.estimated_seconds}s` : null,
+              item.audio.voice?.style,
+            ]}
+          >
+            <p className="whitespace-pre-wrap">{item.audio.script}</p>
+            {item.audio.music_bed && (
+              <p className="mt-2 text-slate-500">Music: {item.audio.music_bed}</p>
+            )}
+          </Detail>
+        )}
+
+        {item.video?.scenes?.length ? (
+          <Detail
+            title="Video script"
+            meta={[
+              item.video.target_seconds ? `~${item.video.target_seconds}s` : null,
+              item.video.faceless ? "faceless" : null,
+            ]}
+          >
+            {item.video.hook && <p className="mb-2 font-medium">Hook: {item.video.hook}</p>}
+            <ol className="space-y-1.5">
+              {item.video.scenes.map((scene, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="shrink-0 tabular-nums text-slate-400">{scene.seconds}s</span>
+                  <span>
+                    {scene.narration}
+                    <span className="block text-slate-400">{scene.visual}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Detail>
+        ) : null}
+
+        {item.visual?.prompt && (
+          <Detail
+            title="Visual"
+            meta={[item.visual.purpose, item.visual.aspect_ratio, item.visual.size]}
+          >
+            <p>{item.visual.prompt}</p>
+            {item.visual.alt_text && (
+              <p className="mt-2 text-slate-500">Alt text: {item.visual.alt_text}</p>
+            )}
+          </Detail>
+        )}
+
+        {item.seo?.primary_keyword && (
+          <Detail title="SEO" meta={[`keyword: ${item.seo.primary_keyword}`]}>
+            {item.seo.keywords?.length ? <p>{item.seo.keywords.join(" · ")}</p> : null}
+            {item.seo.meta_description && (
+              <p className="mt-2 text-slate-500">{item.seo.meta_description}</p>
+            )}
+          </Detail>
         )}
 
         {item.status === "rejected" && item.moderation_reasons.length > 0 && (

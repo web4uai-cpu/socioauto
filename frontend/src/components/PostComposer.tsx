@@ -4,7 +4,9 @@ import { Button } from "./ui/Button";
 import { Card, CardBody, CardHeader } from "./ui/Card";
 import { Field, Input, Textarea } from "./ui/Input";
 import { MediaUploader, type MediaRef } from "./MediaUploader";
+import { PipelineProgress } from "./PipelineProgress";
 import { PenIcon, SparkleIcon } from "./ui/Icon";
+import type { PostKind } from "../types/content";
 
 const PLATFORMS = [
   { id: "instagram", label: "Instagram", tone: "from-pink-500 to-orange-400" },
@@ -12,6 +14,21 @@ const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn", tone: "from-brand-500 to-brand-700" },
   { id: "facebook", label: "Facebook", tone: "from-brand-400 to-brand-600" },
   { id: "tiktok", label: "TikTok", tone: "from-teal-400 to-slate-800" },
+];
+
+/** What gets generated for each kind — mirrors the agent gating in the backend. */
+const POST_KINDS: { id: PostKind | ""; label: string; icon: string; hint: string }[] = [
+  { id: "", label: "Auto", icon: "✨", hint: "Let the agents pick per platform" },
+  { id: "text", label: "Text only", icon: "✍️", hint: "Just copy — no media" },
+  { id: "image", label: "Image", icon: "🖼️", hint: "Copy plus an image" },
+  { id: "audio", label: "Audio only", icon: "🎙️", hint: "Voiceover and cover art — no video" },
+  { id: "video", label: "Video", icon: "🎬", hint: "Script, thumbnail and voiceover" },
+  {
+    id: "faceless_video",
+    label: "Faceless video",
+    icon: "🥷",
+    hint: "B-roll and voiceover — nobody on camera",
+  },
 ];
 
 const MAX_BODY = 4000;
@@ -29,11 +46,14 @@ interface PostComposerProps {
 export function PostComposer({ onCreated }: PostComposerProps) {
   const [mode, setMode] = useState<"manual" | "ai">("manual");
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
+  const [postKind, setPostKind] = useState<PostKind | "">("");
   const [body, setBody] = useState("");
   const [cta, setCta] = useState("");
   const [media, setMedia] = useState<MediaRef[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set once an AI run is generating in the background; swaps the form for the progress view. */
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   function togglePlatform(platform: string) {
     setPlatforms((prev) =>
@@ -49,15 +69,23 @@ export function PostComposer({ onCreated }: PostComposerProps) {
     setBusy(true);
     setError(null);
     try {
-      const campaign =
-        mode === "manual"
-          ? await apiPost<CampaignResponse>("/campaigns/manual", {
-              platforms,
-              body,
-              cta: cta || null,
-              media,
-            })
-          : await apiPost<CampaignResponse>("/campaigns", { prompt: body, platforms });
+      if (mode === "ai") {
+        // The AI pipeline is slow, so run it in the background and show live progress.
+        const started = await apiPost<{ campaign_id: string }>("/campaigns/start", {
+          prompt: body,
+          platforms,
+          post_kind: postKind,
+        });
+        setGeneratingId(started.campaign_id);
+        return;
+      }
+      const campaign = await apiPost<CampaignResponse>("/campaigns/manual", {
+        platforms,
+        body,
+        cta: cta || null,
+        media,
+        post_kind: postKind,
+      });
       setBody("");
       setCta("");
       setMedia([]);
@@ -67,6 +95,16 @@ export function PostComposer({ onCreated }: PostComposerProps) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (generatingId) {
+    return (
+      <PipelineProgress
+        campaignId={generatingId}
+        onComplete={(id) => onCreated({ id, status: "pending_review" })}
+        onRetry={() => setGeneratingId(null)}
+      />
+    );
   }
 
   return (
@@ -119,6 +157,34 @@ export function PostComposer({ onCreated }: PostComposerProps) {
                       }`}
                     />
                     {platform.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field
+            label="Kind of post"
+            hint={POST_KINDS.find((k) => k.id === postKind)?.hint}
+          >
+            <div className="flex flex-wrap gap-2">
+              {POST_KINDS.map((kind) => {
+                const on = postKind === kind.id;
+                return (
+                  <button
+                    key={kind.id || "auto"}
+                    type="button"
+                    onClick={() => setPostKind(kind.id)}
+                    aria-pressed={on}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium
+                      transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
+                        on
+                          ? "bg-brand-50 text-brand-700 ring-2 ring-inset ring-brand-500"
+                          : "bg-white text-slate-600 ring-1 ring-inset ring-slate-200 hover:ring-slate-300"
+                      }`}
+                  >
+                    <span aria-hidden>{kind.icon}</span>
+                    {kind.label}
                   </button>
                 );
               })}

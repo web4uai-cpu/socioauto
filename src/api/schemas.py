@@ -6,6 +6,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+POST_KIND_PATTERN = "^(text|image|video|audio|faceless_video)$"
+# Same set, but empty is allowed and means "no preference — decide per platform".
+OPTIONAL_POST_KIND_PATTERN = "^(text|image|video|audio|faceless_video)?$"
+
 
 class CampaignCreateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
@@ -14,6 +18,8 @@ class CampaignCreateRequest(BaseModel):
     cta: str | None = None
     target_audience: str | None = None
     schedule: datetime | None = None
+    # Blank means "decide per platform" (see resolve_kind in orchestrator/state.py).
+    post_kind: str = Field(default="", pattern=OPTIONAL_POST_KIND_PATTERN)
 
 
 class MediaRef(BaseModel):
@@ -28,11 +34,14 @@ class ContentItemResponse(BaseModel):
     topic: str
     body: str
     status: str
+    kind: str = "image"
+    goal: str = ""
     hashtags: list[str] = []
     media: list[MediaRef] = []
-    # Visual/Video/SEO agent output. Empty dict when the agent skipped this item.
+    # Visual/Video/Audio/SEO agent output. Empty dict when the agent skipped this item.
     visual: dict = {}
     video: dict = {}
+    audio: dict = {}
     seo: dict = {}
     moderation_reasons: list[str] = []
     scheduled_at: datetime | None = None
@@ -47,6 +56,25 @@ class ManualPostCreateRequest(BaseModel):
     cta: str | None = None
     media: list[MediaRef] = []
     schedule: datetime | None = None
+    post_kind: str = Field(default="", pattern=OPTIONAL_POST_KIND_PATTERN)
+
+
+class PipelineStage(BaseModel):
+    name: str
+    label: str
+
+
+class CampaignProgressResponse(BaseModel):
+    campaign_id: str
+    # running | complete | error
+    status: str
+    current_agent: str | None = None
+    current_label: str | None = None
+    completed: list[str] = []
+    stages: list[PipelineStage] = []
+    total: int = 0
+    percent: int = 0
+    error: str | None = None
 
 
 class CampaignResponse(BaseModel):

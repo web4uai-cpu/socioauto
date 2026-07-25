@@ -10,16 +10,43 @@ Defined in `src/orchestrator/graph.py`:
 
 ```
 input-parser → trend-research → content-strategy → content-creation
-  → visual → video → seo → moderation → scheduling → publishing
+  → visual → video → audio → seo → moderation → scheduling → publishing
   → engagement → analytics
 ```
 
 `GENERATION_AGENTS` covers everything up to the gate; `PRE_APPROVAL_PIPELINE` is those plus
-moderation, and is what campaign creation runs. Visual, video, and SEO deliberately sit
-**before** moderation so every generated asset is reviewed, not just the copy.
+moderation, and is what campaign creation runs. Visual, video, audio, and SEO deliberately sit
+**before** moderation so every generated asset is reviewed, not just the copy. Audio runs after
+video so it can voice the script the Video Agent just wrote.
 
 Every LLM-backed agent degrades to a deterministic fallback when no `LLM_API_KEY` is
 configured, so the pipeline stays runnable without credentials.
+
+## Post kinds
+
+`PostKind` (`src/orchestrator/state.py`) decides which generation agents run for an item. The
+caller sets `post_kind` on the request; blank means "decide per platform" via `resolve_kind`
+(TikTok → video, everything else → image).
+
+| kind | visual | video | audio |
+|---|---|---|---|
+| `text` | – | – | – |
+| `image` | feed image | – | – |
+| `video` | thumbnail | ✓ | voiceover |
+| `audio` | cover art | – | podcast clip |
+| `faceless_video` | thumbnail | ✓ (no presenter) | voiceover |
+
+An explicit `video` request is honoured on any platform — `VIDEO_PLATFORMS` only supplies the
+target runtime, falling back to `DEFAULT_TARGET_SECONDS`.
+
+## Progress reporting
+
+`run_campaign` and `run_to_moderation` accept an optional `on_agent(name, index, total)` hook,
+used by `POST /api/v1/campaigns/start` to record per-agent progress into
+`src/orchestrator/progress.py` (Redis-backed, in-memory fallback). The UI polls
+`GET /api/v1/campaigns/{id}/progress`, which also returns the ordered stage list with display
+labels from `AGENT_LABELS` so the client stepper cannot drift from the pipeline. A failing
+progress hook is logged and swallowed — telemetry never takes a campaign down.
 
 ## 1. Orchestrator Agent
 - **File**: `src/orchestrator/graph.py`
@@ -81,7 +108,21 @@ configured, so the pipeline stays runnable without credentials.
   call_to_action, thumbnail_prompt, thumbnail_text, target_seconds, status, source}`
 - **Fallback**: deterministic three-beat script whose scene durations sum to the target.
 
-## 4d. SEO Agent
+## 4d. Audio Agent
+- **File**: `src/agents/audio.py`
+- **Role**: Writes the voiceover script and voice spec for audio-bearing posts.
+- **Scope**: runs for `audio`, `video`, and `faceless_video` kinds. For the video kinds it
+  **reuses the Video Agent's per-scene narration** so the voiceover matches the script rather
+  than drifting from it; for an audio-only post it writes a standalone ~60s script.
+- **Spec, not sound**: no TTS provider is wired up. A provider consumes `audio["script"]` and
+  `audio["voice"]` and appends the rendered file to `item.media`, contract unchanged.
+- **Output schema**: `item.audio = {script, transcript, hook_line, audio_type, voice{style,
+  pace, words_per_minute}, estimated_seconds, music_bed, status, source}` — `audio_type` is
+  `voiceover` for video kinds, `podcast_clip` for audio-only.
+- **Real logic**: `estimate_seconds()` derives runtime from word count ÷ 150 wpm. The script
+  doubles as the caption transcript, which several platforms require for accessibility.
+
+## 4e. SEO Agent
 - **File**: `src/agents/seo.py`
 - **Role**: Optimizes for search/discovery and lead generation. Runs last in the generation
   chain so it can see the final copy, visual, and video.

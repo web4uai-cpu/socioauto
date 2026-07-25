@@ -3,17 +3,20 @@
 Pipeline order (see docs/AGENTS.md):
 
     input-parser -> trend-research -> content-strategy -> content-creation
-      -> visual -> video -> seo -> moderation -> scheduling -> publishing
+      -> visual -> video -> audio -> seo -> moderation -> scheduling -> publishing
       -> engagement -> analytics
 
-Visual, video, and SEO run *before* moderation on purpose: everything they generate is
+Visual, video, audio, and SEO run *before* moderation on purpose: everything they generate is
 reviewed by the moderation gate along with the copy, so nothing reaches a platform
-unreviewed.
+unreviewed. Audio runs after video so it can voice the script the Video Agent just wrote.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from src.agents.analytics import AnalyticsAgent
+from src.agents.audio import AudioAgent
 from src.agents.content_creation import ContentCreationAgent
 from src.agents.content_strategy import ContentStrategyAgent
 from src.agents.engagement import EngagementAgent
@@ -25,7 +28,30 @@ from src.agents.seo import SEOAgent
 from src.agents.trend_research import TrendResearchAgent
 from src.agents.video import VideoAgent
 from src.agents.visual import VisualAgent
+from src.logging_config import get_logger
 from src.orchestrator.state import CampaignState
+
+logger = get_logger(__name__)
+
+# Called as each agent finishes: (agent_name, completed_count, total).
+ProgressHook = Callable[[str, int, int], None]
+
+# Human-readable stage names for the progress UI, keyed by agent name.
+AGENT_LABELS: dict[str, str] = {
+    "input-parser": "Understanding your request",
+    "trend-research": "Researching trends",
+    "content-strategy": "Planning content",
+    "content-creation": "Writing copy",
+    "visual": "Designing visuals",
+    "video": "Scripting video",
+    "audio": "Writing voiceover",
+    "seo": "Optimising for search",
+    "moderation": "Safety review",
+    "scheduling": "Scheduling",
+    "publishing": "Publishing",
+    "engagement": "Monitoring engagement",
+    "analytics": "Recording analytics",
+}
 
 # Agents that generate or refine content, up to (but not including) the moderation gate.
 GENERATION_AGENTS = [
@@ -35,6 +61,7 @@ GENERATION_AGENTS = [
     ContentCreationAgent(),
     VisualAgent(),
     VideoAgent(),
+    AudioAgent(),
     SEOAgent(),
 ]
 
@@ -48,10 +75,26 @@ PIPELINE = [
 ]
 
 
-def run_campaign(state: CampaignState) -> CampaignState:
-    for agent in PIPELINE:
+def _run(agents: list, state: CampaignState, on_agent: ProgressHook | None) -> CampaignState:
+    """Run `agents` in order, reporting completion after each.
+
+    A failing progress hook is logged and ignored — progress reporting must never take a
+    campaign down with it.
+    """
+    total = len(agents)
+    for index, agent in enumerate(agents, start=1):
         state = agent.run(state)
+        if on_agent is None:
+            continue
+        try:
+            on_agent(agent.name, index, total)
+        except Exception as exc:  # noqa: BLE001 - telemetry must not break generation
+            logger.warning("progress hook failed", extra={"agent": agent.name, "error": str(exc)})
     return state
+
+
+def run_campaign(state: CampaignState, on_agent: ProgressHook | None = None) -> CampaignState:
+    return _run(PIPELINE, state, on_agent)
 
 
 # Agents run at campaign-creation time, up to (and including) the moderation gate. Scheduling
@@ -59,11 +102,13 @@ def run_campaign(state: CampaignState) -> CampaignState:
 PRE_APPROVAL_PIPELINE = [*GENERATION_AGENTS, ModerationAgent()]
 
 
-def run_to_moderation(state: CampaignState) -> CampaignState:
-    """Run parsing → research → strategy → creation → visual → video → SEO → moderation.
+def run_to_moderation(state: CampaignState, on_agent: ProgressHook | None = None) -> CampaignState:
+    """Run parsing → research → strategy → creation → visual → video → audio → SEO → moderation.
 
     Stops before scheduling/publishing so a human can approve first.
+
+    Args:
+        state: Campaign state to run through the pipeline.
+        on_agent: Optional hook called as each agent completes, for progress reporting.
     """
-    for agent in PRE_APPROVAL_PIPELINE:
-        state = agent.run(state)
-    return state
+    return _run(PRE_APPROVAL_PIPELINE, state, on_agent)

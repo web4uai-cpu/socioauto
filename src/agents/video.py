@@ -9,16 +9,18 @@ from __future__ import annotations
 
 from src.agents.base import BaseAgent
 from src.llm.provider import get_provider
-from src.orchestrator.state import CampaignState, ContentItem
+from src.orchestrator.state import VIDEO_KINDS, CampaignState, ContentItem, PostKind
 
-# Platforms with a native short-form video surface, and their target runtime in seconds.
+# Target runtime in seconds per platform's native short-form surface.
 VIDEO_PLATFORMS: dict[str, int] = {
     "tiktok": 30,
     "instagram": 30,  # Reels
     "facebook": 45,
     "x": 45,
 }
-# LinkedIn video exists but underperforms short-form; skipped unless explicitly requested.
+# Used when the caller asks for video on a platform without a tuned short-form runtime
+# (LinkedIn, say) — an explicit request is honoured rather than silently dropped.
+DEFAULT_TARGET_SECONDS = 45
 
 VIDEO_SCHEMA = {
     "type": "object",
@@ -69,13 +71,17 @@ class VideoAgent(BaseAgent):
         provider = get_provider()
         scripted = 0
         for item in state.calendar:
-            if item.video or item.platform not in VIDEO_PLATFORMS:
+            # Kind decides this, not platform: the user asked for a video, so honour it even
+            # on a platform we would not have defaulted to video for.
+            if item.video or item.kind not in VIDEO_KINDS:
                 continue
-            target = VIDEO_PLATFORMS[item.platform]
-            script = self._script_with_llm(provider, state, item, target) or self._fallback(
-                item, target
-            )
+            target = VIDEO_PLATFORMS.get(item.platform, DEFAULT_TARGET_SECONDS)
+            faceless = item.kind == PostKind.FACELESS_VIDEO
+            script = self._script_with_llm(
+                provider, state, item, target, faceless
+            ) or self._fallback(item, target, faceless)
             script["target_seconds"] = target
+            script["faceless"] = faceless
             script["status"] = "script"  # becomes "rendered" once a video pipeline runs it
             item.video = script
             scripted += 1
@@ -83,8 +89,15 @@ class VideoAgent(BaseAgent):
         return state
 
     def _script_with_llm(
-        self, provider, state: CampaignState, item: ContentItem, target: int
+        self, provider, state: CampaignState, item: ContentItem, target: int, faceless: bool
     ) -> dict | None:
+        style = (
+            "This is a FACELESS video: no on-camera presenter and no talking-head shots. "
+            "Every scene visual must be b-roll, screen recording, motion graphics, or stock "
+            "footage carried by voiceover."
+            if faceless
+            else "A presenter may appear on camera."
+        )
         prompt = (
             f"Brand: {state.brand_name}\n"
             f"Brand voice: {state.voice_guidelines or 'professional and friendly'}\n"
@@ -92,6 +105,7 @@ class VideoAgent(BaseAgent):
             f"Target runtime: about {target} seconds\n"
             f"Topic: {item.topic}\n"
             f"Companion caption: {item.body}\n\n"
+            f"{style}\n\n"
             "Write the video script as 3-5 scenes whose seconds sum to roughly the target "
             "runtime, plus a thumbnail prompt."
         )
@@ -101,15 +115,20 @@ class VideoAgent(BaseAgent):
         result["source"] = provider.name
         return result
 
-    def _fallback(self, item: ContentItem, target: int) -> dict:
+    def _fallback(self, item: ContentItem, target: int, faceless: bool) -> dict:
         """Deterministic three-beat script, used when no LLM is configured."""
         third = round(target / 3)
+        opening_visual = (
+            "Motion-graphic title card over b-roll"
+            if faceless
+            else "Talking head, direct to camera"
+        )
         return {
             "hook": f"Here's what changed: {item.topic}",
             "scenes": [
                 {
                     "narration": f"Here's what changed: {item.topic}",
-                    "visual": "Talking head, direct to camera",
+                    "visual": opening_visual,
                     "seconds": third,
                 },
                 {

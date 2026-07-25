@@ -11,7 +11,7 @@ from src.agents.seo import PLATFORM_HASHTAG_LIMIT, SEOAgent
 from src.agents.video import VIDEO_PLATFORMS, VideoAgent
 from src.agents.visual import PLATFORM_VISUAL_SPEC, VisualAgent
 from src.orchestrator.graph import PIPELINE, PRE_APPROVAL_PIPELINE
-from src.orchestrator.state import CampaignState, ContentItem, ContentStatus
+from src.orchestrator.state import CampaignState, ContentItem, ContentStatus, PostKind
 
 
 def _state(**kwargs) -> CampaignState:
@@ -95,16 +95,21 @@ def test_visual_agent_respects_existing_spec():
 # --- Video -------------------------------------------------------------------------
 
 
-def test_video_agent_skips_non_video_platforms():
+def test_video_agent_skips_items_that_are_not_video_kinds():
+    """Kind gates the video agent — see test_post_kinds_and_audio.py for the full matrix."""
     state = _state(platforms=["linkedin"])
-    state.calendar = [ContentItem(platform="linkedin", topic="Launch")]
+    state.calendar = [ContentItem(platform="linkedin", topic="Launch", kind=PostKind.IMAGE)]
     state = VideoAgent().run(state)
     assert state.calendar[0].video == {}
 
 
-def test_video_agent_scripts_video_platforms():
+def test_video_agent_scripts_video_kinds():
     state = _state(platforms=["tiktok"])
-    state.calendar = [ContentItem(platform="tiktok", topic="Launch", body="We shipped it.")]
+    state.calendar = [
+        ContentItem(
+            platform="tiktok", topic="Launch", body="We shipped it.", kind=PostKind.VIDEO
+        )
+    ]
     state = VideoAgent().run(state)
 
     video = state.calendar[0].video
@@ -116,7 +121,7 @@ def test_video_agent_scripts_video_platforms():
 
 def test_video_scene_durations_sum_to_target():
     state = _state(platforms=["tiktok"])
-    state.calendar = [ContentItem(platform="tiktok", topic="Launch")]
+    state.calendar = [ContentItem(platform="tiktok", topic="Launch", kind=PostKind.VIDEO)]
     state = VideoAgent().run(state)
 
     video = state.calendar[0].video
@@ -172,7 +177,7 @@ def test_seo_meta_description_is_truncated():
 # --- Pipeline wiring ---------------------------------------------------------------
 
 
-def test_pipeline_runs_all_nine_workflow_stages_in_order():
+def test_pipeline_runs_all_workflow_stages_in_order():
     names = [a.name for a in PIPELINE]
     assert names == [
         "input-parser",
@@ -181,6 +186,7 @@ def test_pipeline_runs_all_nine_workflow_stages_in_order():
         "content-creation",
         "visual",
         "video",
+        "audio",
         "seo",
         "moderation",
         "scheduling",
@@ -191,27 +197,29 @@ def test_pipeline_runs_all_nine_workflow_stages_in_order():
 
 
 def test_generation_agents_all_run_before_the_moderation_gate():
-    """Everything visual/video/SEO generate must be reviewed before publishing."""
+    """Everything visual/video/audio/SEO generate must be reviewed before publishing."""
     names = [a.name for a in PRE_APPROVAL_PIPELINE]
     assert names[-1] == "moderation"
-    for generated in ("visual", "video", "seo"):
+    for generated in ("visual", "video", "audio", "seo"):
         assert names.index(generated) < names.index("moderation")
 
 
-def test_full_pipeline_produces_visual_video_and_seo():
+def test_full_pipeline_produces_visual_video_audio_and_seo():
     from src.orchestrator.graph import run_campaign
 
     state = CampaignState(
         brand_name="Acme AI",
-        platforms=["tiktok"],
+        platforms=["tiktok"],  # video-first platform, so defaults to the video kind
         raw_input="Announce our new AI scheduling assistant",
     )
     state = run_campaign(state)
 
     item = state.calendar[0]
     assert item.status == ContentStatus.PUBLISHED
+    assert item.kind is PostKind.VIDEO
     assert item.visual["prompt"]
     assert item.video["scenes"]
+    assert item.audio["script"]
     assert item.seo["primary_keyword"]
 
 
