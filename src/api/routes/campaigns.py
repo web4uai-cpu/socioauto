@@ -44,7 +44,11 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
                 topic=item.topic,
                 body=item.body,
                 status=item.status.value,
+                hashtags=item.hashtags,
                 media=item.media,
+                visual=item.visual,
+                video=item.video,
+                seo=item.seo,
                 moderation_reasons=item.moderation_reasons,
                 scheduled_at=item.scheduled_at,
                 published_at=item.published_at,
@@ -118,7 +122,8 @@ def create_campaign(
         brand_name=current_user.email,
         platforms=req.platforms,
         voice_guidelines={"tone": req.tone, "cta": req.cta, "audience": req.target_audience},
-        trends=[{"topic": req.prompt, "score": 1.0, "source": "nl-prompt"}],
+        # The Input Parser turns this into a structured brief and seeds the research agent.
+        raw_input=req.prompt,
     )
     state = run_to_moderation(state)
 
@@ -164,7 +169,8 @@ def enqueue_campaign(
         brand_name=current_user.email,
         platforms=req.platforms,
         voice_guidelines={"tone": req.tone, "cta": req.cta, "audience": req.target_audience},
-        trends=[{"topic": req.prompt, "score": 1.0, "source": "nl-prompt"}],
+        # The Input Parser turns this into a structured brief and seeds the research agent.
+        raw_input=req.prompt,
     )
     record = CampaignRecord(
         id=campaigns_repo.new_id(),

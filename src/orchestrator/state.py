@@ -35,6 +35,12 @@ class ContentItem:
     media_brief: str = ""
     media: list[dict[str, str]] = field(default_factory=list)
     cta: str = ""
+    # Visual Agent: image/thumbnail generation spec (prompt, alt_text, aspect_ratio).
+    visual: dict[str, Any] = field(default_factory=dict)
+    # Video Agent: script, scene beats, and thumbnail prompt for video-capable platforms.
+    video: dict[str, Any] = field(default_factory=dict)
+    # SEO Agent: keywords, meta description, slug, and lead-generation CTA.
+    seo: dict[str, Any] = field(default_factory=dict)
     status: ContentStatus = ContentStatus.DRAFT
     moderation_reasons: list[str] = field(default_factory=list)
     scheduled_at: datetime | None = None
@@ -50,6 +56,9 @@ class ContentItem:
             "media_brief": self.media_brief,
             "media": list(self.media),
             "cta": self.cta,
+            "visual": dict(self.visual),
+            "video": dict(self.video),
+            "seo": dict(self.seo),
             "status": self.status.value,
             "moderation_reasons": list(self.moderation_reasons),
             "scheduled_at": _iso(self.scheduled_at),
@@ -67,6 +76,9 @@ class ContentItem:
             media_brief=data.get("media_brief", ""),
             media=list(data.get("media", [])),
             cta=data.get("cta", ""),
+            visual=dict(data.get("visual", {})),
+            video=dict(data.get("video", {})),
+            seo=dict(data.get("seo", {})),
             status=ContentStatus(data.get("status", "draft")),
             moderation_reasons=list(data.get("moderation_reasons", [])),
             scheduled_at=_parse_dt(data.get("scheduled_at")),
@@ -81,6 +93,10 @@ class CampaignState:
     voice_guidelines: dict[str, Any] = field(default_factory=dict)
     auto_publish: bool = False
     platforms: list[str] = field(default_factory=list)
+    # Raw natural-language request from the user; parsed into `brief` by the Input Parser.
+    raw_input: str = ""
+    # Input Parser output: intent, goal, audience, tone, topic, constraints.
+    brief: dict[str, Any] = field(default_factory=dict)
     trends: list[dict[str, Any]] = field(default_factory=list)
     calendar: list[ContentItem] = field(default_factory=list)
     analytics: list[dict[str, Any]] = field(default_factory=list)
@@ -98,6 +114,8 @@ class CampaignState:
             "voice_guidelines": self.voice_guidelines,
             "auto_publish": self.auto_publish,
             "platforms": list(self.platforms),
+            "raw_input": self.raw_input,
+            "brief": dict(self.brief),
             "trends": self.trends,
             "calendar": [item.to_dict() for item in self.calendar],
             "analytics": self.analytics,
@@ -111,6 +129,8 @@ class CampaignState:
             voice_guidelines=data.get("voice_guidelines", {}),
             auto_publish=data.get("auto_publish", False),
             platforms=list(data.get("platforms", [])),
+            raw_input=data.get("raw_input", ""),
+            brief=dict(data.get("brief", {})),
             trends=data.get("trends", []),
             calendar=[ContentItem.from_dict(item) for item in data.get("calendar", [])],
             analytics=data.get("analytics", []),

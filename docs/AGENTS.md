@@ -4,12 +4,40 @@ Each agent below is implemented as a class in `src/agents/` conforming to the `B
 interface (`run(state: CampaignState) -> CampaignState`). Prompts are stored alongside code in
 `src/agents/<agent>/prompt.md` and loaded at runtime — this file documents the spec.
 
+## Pipeline order
+
+Defined in `src/orchestrator/graph.py`:
+
+```
+input-parser → trend-research → content-strategy → content-creation
+  → visual → video → seo → moderation → scheduling → publishing
+  → engagement → analytics
+```
+
+`GENERATION_AGENTS` covers everything up to the gate; `PRE_APPROVAL_PIPELINE` is those plus
+moderation, and is what campaign creation runs. Visual, video, and SEO deliberately sit
+**before** moderation so every generated asset is reviewed, not just the copy.
+
+Every LLM-backed agent degrades to a deterministic fallback when no `LLM_API_KEY` is
+configured, so the pipeline stays runnable without credentials.
+
 ## 1. Orchestrator Agent
 - **File**: `src/orchestrator/graph.py`
 - **Role**: Owns the campaign state machine, decides next agent, enforces per-brand
   `auto_publish` policy, handles retries/error routing.
 - **Inputs**: `CampaignState` (brand config, current stage, history)
 - **Outputs**: next stage transition + side-effect log entry
+
+## 1b. Input Parser Agent
+- **File**: `src/agents/input_parser.py`
+- **Role**: First agent in the pipeline. Turns `state.raw_input` (the user's natural-language
+  request) into a structured brief so downstream agents never re-parse the raw prompt.
+- **Seeds**: when the caller supplied no trends, seeds `state.trends` with the parsed topic;
+  fills `voice_guidelines` tone/audience only where the caller left them unset.
+- **Output schema**: `state.brief = {intent, topic, goal, target_audience, tone, key_points[],
+  constraints[]}` where `intent ∈ {announce, educate, promote, engage, recruit, celebrate}`
+- **Fallback**: keyword-cue intent classification + first-sentence topic extraction.
+- **No-op**: leaves state untouched when `raw_input` is empty (manual posts).
 
 ## 2. Trend Research Agent
 - **Role**: Discover trending topics/hashtags relevant to brand niche.
@@ -30,6 +58,39 @@ interface (`run(state: CampaignState) -> CampaignState`). Prompts are stored alo
 - **Constraints**: respects character limits (X 280, LinkedIn 3000, etc.), brand tone,
   hashtag/style guide.
 - **Output schema**: `{platform, body, hashtags[], media_brief, cta}`
+
+## 4b. Visual Agent
+- **File**: `src/agents/visual.py`
+- **Role**: Attaches an image/thumbnail generation spec to every calendar item.
+- **Scope**: writes the *spec*, not pixels — no image-generation provider is wired up yet.
+  A future provider consumes `visual["prompt"]` + `aspect_ratio` and appends the rendered file
+  to `item.media`; this agent's contract does not change when that lands.
+- **Platform logic**: native aspect ratio/size per platform (`PLATFORM_VISUAL_SPEC`) —
+  Instagram 4:5, TikTok 9:16, X 16:9, LinkedIn/Facebook 1.91:1.
+- **Output schema**: `item.visual = {prompt, alt_text, overlay_text, style, aspect_ratio,
+  size, status, source}` — `status` is `"spec"` until a renderer runs.
+- **Guardrail**: prompts must not depict real identifiable people or unprovided logos.
+
+## 4c. Video Agent
+- **File**: `src/agents/video.py`
+- **Role**: Writes a short-form video script and thumbnail prompt.
+- **Scope**: only runs for platforms with a native short-form surface (`VIDEO_PLATFORMS`:
+  TikTok/Instagram 30s, Facebook/X 45s). LinkedIn is skipped by default. Items on other
+  platforms keep `video == {}`.
+- **Output schema**: `item.video = {hook, scenes[{narration, visual, seconds}],
+  call_to_action, thumbnail_prompt, thumbnail_text, target_seconds, status, source}`
+- **Fallback**: deterministic three-beat script whose scene durations sum to the target.
+
+## 4d. SEO Agent
+- **File**: `src/agents/seo.py`
+- **Role**: Optimizes for search/discovery and lead generation. Runs last in the generation
+  chain so it can see the final copy, visual, and video.
+- **Also mutates**: merges its hashtags into `item.hashtags`, dedupes, and caps to the
+  platform limit (`PLATFORM_HASHTAG_LIMIT`: Instagram 12, TikTok 6, LinkedIn 5, X/Facebook 3).
+- **Output schema**: `item.seo = {primary_keyword, keywords[], meta_description (≤155),
+  slug, lead_magnet, lead_cta, source}`
+- **Guardrail**: never rewrites `item.body` — moderation must review the copy the Content
+  Creation Agent produced, not an SEO rewrite of it.
 
 ## 5. Moderation Agent
 - **Role**: Mandatory safety/compliance gate before scheduling.

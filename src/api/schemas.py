@@ -28,7 +28,12 @@ class ContentItemResponse(BaseModel):
     topic: str
     body: str
     status: str
+    hashtags: list[str] = []
     media: list[MediaRef] = []
+    # Visual/Video/SEO agent output. Empty dict when the agent skipped this item.
+    visual: dict = {}
+    video: dict = {}
+    seo: dict = {}
     moderation_reasons: list[str] = []
     scheduled_at: datetime | None = None
     published_at: datetime | None = None
