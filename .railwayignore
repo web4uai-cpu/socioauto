@@ -1,0 +1,9 @@
+# Keep `railway up` uploads small — mirrors .dockerignore.
+.venv/
+__pycache__/
+*.pyc
+.git/
+.env
+frontend/node_modules/
+frontend/dist/
+tests/
