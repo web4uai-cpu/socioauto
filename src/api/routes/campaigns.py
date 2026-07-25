@@ -5,10 +5,16 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.agents.moderation import ModerationAgent
 from src.agents.publishing import PublishingAgent
 from src.agents.scheduling import SchedulingAgent
 from src.api.deps import enforce_rate_limit, get_current_user
-from src.api.schemas import CampaignCreateRequest, CampaignResponse, ContentItemResponse
+from src.api.schemas import (
+    CampaignCreateRequest,
+    CampaignResponse,
+    ContentItemResponse,
+    ManualPostCreateRequest,
+)
 from src.db.models import User
 from src.db.repositories import accounts as accounts_repo
 from src.db.repositories import audit
@@ -16,7 +22,7 @@ from src.db.repositories import campaigns as campaigns_repo
 from src.db.repositories.campaigns import CampaignRecord
 from src.db.session import get_db
 from src.orchestrator.graph import run_to_moderation
-from src.orchestrator.state import CampaignState, ContentStatus
+from src.orchestrator.state import CampaignState, ContentItem, ContentStatus
 
 router = APIRouter(
     prefix="/api/v1/campaigns", tags=["campaigns"], dependencies=[Depends(enforce_rate_limit)]
@@ -38,6 +44,8 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
                 topic=item.topic,
                 body=item.body,
                 status=item.status.value,
+                media=item.media,
+                moderation_reasons=item.moderation_reasons,
                 scheduled_at=item.scheduled_at,
                 published_at=item.published_at,
                 external_post_id=item.external_post_id,
@@ -45,6 +53,56 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
             for item in record.state.calendar
         ],
     )
+
+
+@router.post("/manual", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)
+def create_manual_post(
+    req: ManualPostCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CampaignResponse:
+    """Create a user-authored post (own text, optional uploaded audio/video/image) instead of
+    letting the AI pipeline generate it. Still runs through the mandatory Moderation Agent gate
+    before it can be scheduled or published — see `/approve` and `/schedule`.
+    """
+    state = CampaignState(brand_name=current_user.email, platforms=req.platforms)
+    state.calendar = [
+        ContentItem(
+            platform=platform,
+            topic=req.body[:80],
+            body=req.body,
+            hashtags=list(req.hashtags),
+            media=[m.model_dump() for m in req.media],
+            cta=req.cta or "",
+            status=ContentStatus.PENDING_MODERATION,
+            scheduled_at=req.schedule,
+        )
+        for platform in req.platforms
+    ]
+    state = ModerationAgent().run(state)
+
+    any_approved = any(item.status == ContentStatus.APPROVED for item in state.calendar)
+    record = CampaignRecord(
+        id=campaigns_repo.new_id(),
+        user_id=str(current_user.id),
+        prompt=req.body,
+        platforms=req.platforms,
+        tone="manual",
+        cta=req.cta,
+        target_audience=None,
+        status="pending_review" if any_approved else "needs_revision",
+        state=state,
+    )
+    campaigns_repo.save(db, record)
+    audit.record(
+        db,
+        actor=current_user.email,
+        action="campaign.manual_created",
+        entity_type="campaign",
+        entity_id=record.id,
+        details={"status": record.status, "platforms": req.platforms},
+    )
+    return _to_response(record)
 
 
 @router.post("", response_model=CampaignResponse, status_code=status.HTTP_201_CREATED)

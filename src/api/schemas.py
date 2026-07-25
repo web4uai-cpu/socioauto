@@ -16,14 +16,32 @@ class CampaignCreateRequest(BaseModel):
     schedule: datetime | None = None
 
 
+class MediaRef(BaseModel):
+    id: str
+    url: str
+    content_type: str
+    kind: str
+
+
 class ContentItemResponse(BaseModel):
     platform: str
     topic: str
     body: str
     status: str
+    media: list[MediaRef] = []
+    moderation_reasons: list[str] = []
     scheduled_at: datetime | None = None
     published_at: datetime | None = None
     external_post_id: str | None = None
+
+
+class ManualPostCreateRequest(BaseModel):
+    platforms: list[str] = Field(min_length=1)
+    body: str = Field(min_length=1, max_length=4000)
+    hashtags: list[str] = []
+    cta: str | None = None
+    media: list[MediaRef] = []
+    schedule: datetime | None = None
 
 
 class CampaignResponse(BaseModel):

@@ -1,31 +1,76 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 import { Login } from "./components/Login";
-import { AdminDashboard } from "./pages/AdminDashboard";
+import { resolveRole } from "./api/client";
+import { AdminLayout } from "./pages/admin/AdminLayout";
+import { AnalyticsPage } from "./pages/admin/AnalyticsPage";
+import { ContentPage } from "./pages/admin/ContentPage";
+import { UsersPage } from "./pages/admin/UsersPage";
+import { BillingPage } from "./pages/admin/BillingPage";
+import { IntegrationsPage } from "./pages/admin/IntegrationsPage";
+import { AppLayout } from "./pages/app/AppLayout";
+import { ComposePage } from "./pages/app/ComposePage";
+import { PostsPage } from "./pages/app/PostsPage";
+import { PostDetailPage } from "./pages/app/PostDetailPage";
+import { PersonalAnalyticsPage } from "./pages/app/PersonalAnalyticsPage";
 
-/** Auth gate: show the dashboard once a token is stored, otherwise the sign-in form. */
+type Role = "admin" | "user" | null;
+
+/** Auth + role gate: routes to the enterprise admin console or the end-user console. */
 export function App() {
   const [authenticated, setAuthenticated] = useState(
     () => localStorage.getItem("access_token") !== null,
   );
+  const [role, setRole] = useState<Role>(null);
+
+  useEffect(() => {
+    if (!authenticated) {
+      setRole(null);
+      return;
+    }
+    resolveRole().then(setRole);
+  }, [authenticated]);
+
+  function signOut() {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+    sessionStorage.removeItem("role");
+    setAuthenticated(false);
+  }
 
   if (!authenticated) {
     return <Login onAuthenticated={() => setAuthenticated(true)} />;
   }
 
-  function signOut() {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    setAuthenticated(false);
+  if (role === null) {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading…</div>;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="flex justify-end p-4">
-        <button type="button" onClick={signOut} className="text-sm text-gray-600 underline">
-          Sign out
-        </button>
-      </header>
-      <AdminDashboard />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path="/admin/*"
+          element={role === "admin" ? <AdminLayout onSignOut={signOut} /> : <Navigate to="/app/compose" replace />}
+        >
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="content" element={<ContentPage />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="billing" element={<BillingPage />} />
+          <Route path="integrations" element={<IntegrationsPage />} />
+          <Route index element={<Navigate to="analytics" replace />} />
+        </Route>
+
+        <Route path="/app/*" element={<AppLayout onSignOut={signOut} />}>
+          <Route path="compose" element={<ComposePage />} />
+          <Route path="posts" element={<PostsPage />} />
+          <Route path="posts/:id" element={<PostDetailPage />} />
+          <Route path="analytics" element={<PersonalAnalyticsPage />} />
+          <Route index element={<Navigate to="compose" replace />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to={role === "admin" ? "/admin" : "/app"} replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }

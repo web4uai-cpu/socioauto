@@ -46,3 +46,33 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   if (!res.ok) throw await failure(res, "PUT", path);
   return res.json() as Promise<T>;
 }
+
+/** Multipart upload — deliberately omits Content-Type so the browser sets the boundary. */
+export async function apiUpload<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: form,
+  });
+  if (!res.ok) throw await failure(res, "POST", path);
+  return res.json() as Promise<T>;
+}
+
+/** Root the backend serves media/static assets from, for resolving relative /media/* URLs. */
+export const API_ORIGIN = API_BASE.replace(/\/api\/v1\/?$/, "");
+
+/** Best-effort admin check: an admin-only endpoint succeeds only for admins. Cached per session. */
+export async function resolveRole(): Promise<"admin" | "user"> {
+  const cached = sessionStorage.getItem("role");
+  if (cached === "admin" || cached === "user") return cached;
+  try {
+    await apiGet("/admin/users");
+    sessionStorage.setItem("role", "admin");
+    return "admin";
+  } catch {
+    sessionStorage.setItem("role", "user");
+    return "user";
+  }
+}

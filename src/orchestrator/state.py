@@ -33,6 +33,7 @@ class ContentItem:
     body: str = ""
     hashtags: list[str] = field(default_factory=list)
     media_brief: str = ""
+    media: list[dict[str, str]] = field(default_factory=list)
     cta: str = ""
     status: ContentStatus = ContentStatus.DRAFT
     moderation_reasons: list[str] = field(default_factory=list)
@@ -47,6 +48,7 @@ class ContentItem:
             "body": self.body,
             "hashtags": list(self.hashtags),
             "media_brief": self.media_brief,
+            "media": list(self.media),
             "cta": self.cta,
             "status": self.status.value,
             "moderation_reasons": list(self.moderation_reasons),
@@ -63,6 +65,7 @@ class ContentItem:
             body=data.get("body", ""),
             hashtags=list(data.get("hashtags", [])),
             media_brief=data.get("media_brief", ""),
+            media=list(data.get("media", [])),
             cta=data.get("cta", ""),
             status=ContentStatus(data.get("status", "draft")),
             moderation_reasons=list(data.get("moderation_reasons", [])),

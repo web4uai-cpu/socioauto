@@ -16,3 +16,6 @@ frontend/node_modules/
 frontend/dist/
 # Incremental TypeScript build cache.
 frontend/tsconfig.tsbuildinfo
+.vercel
+# Local media uploads (dev-only disk storage; production points at a real object store).
+data/

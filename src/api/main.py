@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -17,6 +18,7 @@ from src.api.routes import (
     auth,
     billing,
     campaigns,
+    media,
     settings,
     users,
     webhooks,
@@ -26,6 +28,7 @@ from src.db.session import engine
 from src.orchestrator.graph import run_campaign
 from src.orchestrator.state import CampaignState
 from src.security.startup import verify_production_secrets
+from src.storage import media_storage
 
 
 @asynccontextmanager
@@ -61,6 +64,11 @@ app.include_router(users.router)
 app.include_router(billing.router)
 app.include_router(settings.router)
 app.include_router(webhooks.router)
+app.include_router(media.router)
+
+# Dev-only static serving of uploaded media; production should point at a real object store
+# (S3/R2) behind the same `MediaStorage` interface instead of mounting local disk.
+app.mount("/media", StaticFiles(directory=media_storage.root), name="media")
 
 
 class CampaignRequest(BaseModel):
