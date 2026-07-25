@@ -133,11 +133,40 @@ Which agents run is gated by `post_kind`: an `audio` post gets a voiceover and c
 **no video script**; a `text` post gets none of them. Full matrix in
 [AGENTS.md](AGENTS.md#post-kinds).
 
-Caveats against the spec's numbers:
-- **Image sizes**: LinkedIn 1200x627 matches; Instagram uses 1080x1350 (4:5). X uses 1600x900
-  rather than 1200x675 — same 16:9 ratio, larger. `PLATFORM_VISUAL_SPEC` in `visual.py`.
-- **YouTube is not a supported platform**, so there is no 60-second YouTube script. TikTok is
-  30s as specified; Instagram 30s, Facebook/X 45s.
+### Per-platform copy shaping
+
+`PLATFORM_SPECS` in [content_creation.py](../src/agents/content_creation.py) carries the
+length target and editorial style for each platform, both fed into the drafting prompt:
+
+| Platform | Chars | Word target | Style | Threads |
+|---|---|---|---|---|
+| Instagram | 2200 | 125-150 ✅ spec | visual-first, hook then short paragraphs | – |
+| X | 280 | – | punchy, one idea per post | ✅ |
+| LinkedIn | 3000 | 150-300 ✅ spec | professional, insight-led | – |
+| Facebook | 5000 | 80-160 | community-focused, invites replies | – |
+| TikTok | 2200 | 20-60 | casual, front-loaded hook | – |
+
+**Thread option (X)** — `split_into_thread()` splits overlong copy on sentence boundaries into
+numbered parts (`1/n`), each within the limit, capped at `MAX_THREAD_PARTS`. Continuation parts
+land in `item.thread`; `item.body` is part 1. Platforms without threads still truncate. This
+replaced blanket truncation, which silently discarded the end of every long post.
+
+### Hashtag counts
+
+`PLATFORM_HASHTAG_LIMIT` in [seo.py](../src/agents/seo.py): Instagram 20 (spec's 15-20 range),
+TikTok 6, LinkedIn 5, X 3, Facebook 3. Instagram rewards a dense tag set; the others do not,
+and stuffing them costs reach.
+
+### Caveats against the spec's numbers
+
+- **Image sizes** now match the spec exactly: Instagram 1080x1350 (4:5), X 1200x675 (16:9),
+  LinkedIn 1200x627. `PLATFORM_VISUAL_SPEC` in `visual.py`.
+- **YouTube is not a supported platform.** There is no 60-second YouTube script, and adding one
+  is not just a runtime entry: `RestPlatformClient` raises `PlatformHttpError` for any platform
+  without a configured endpoint, so YouTube would need a Data API client plus its OAuth flow
+  before a script could ever be published. TikTok is 30s as specified; Instagram 30s,
+  Facebook/X 45s.
+- **Agents run sequentially, not in parallel.**
 
 ### Phase 4: REVIEW & APPROVAL (User-dependent)
 

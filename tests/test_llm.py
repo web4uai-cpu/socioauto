@@ -6,6 +6,8 @@ or a stub injected via monkeypatch.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from src.agents.content_creation import ContentCreationAgent
@@ -78,7 +80,8 @@ def test_content_creation_uses_llm_draft(monkeypatch):
     assert item.status == ContentStatus.PENDING_MODERATION
 
 
-def test_content_creation_truncates_to_platform_limit(monkeypatch):
+def test_content_creation_threads_long_posts_on_x(monkeypatch):
+    """X supports threads, so overlong copy is split rather than truncated — nothing is lost."""
     stub = StubProvider(payload={"body": "x" * 400, "hashtags": [], "media_brief": "", "cta": ""})
     monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
 
@@ -86,7 +89,26 @@ def test_content_creation_truncates_to_platform_limit(monkeypatch):
     state.calendar.append(ContentItem(platform="x", topic="long post"))
     ContentCreationAgent().run(state)
 
-    assert len(state.calendar[0].body) == 280
+    item = state.calendar[0]
+    assert item.thread, "expected a thread continuation"
+    assert len(item.body) <= 280
+    assert all(len(part) <= 280 for part in item.thread)
+    # Every character of the original survives across the parts.
+    recovered = "".join(re.sub(r"\s*\d+/\d+$", "", p) for p in [item.body, *item.thread])
+    assert recovered.count("x") == 400
+
+
+def test_content_creation_truncates_when_platform_has_no_threads(monkeypatch):
+    """Instagram has no thread concept, so the limit is enforced by truncation."""
+    stub = StubProvider(payload={"body": "x" * 3000, "hashtags": [], "media_brief": "", "cta": ""})
+    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
+
+    state = CampaignState(brand_name="Acme", platforms=["instagram"])
+    state.calendar.append(ContentItem(platform="instagram", topic="long post"))
+    ContentCreationAgent().run(state)
+
+    assert len(state.calendar[0].body) == 2200
+    assert state.calendar[0].thread == []
 
 
 def test_content_creation_falls_back_when_llm_unavailable(monkeypatch):

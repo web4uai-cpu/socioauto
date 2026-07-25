@@ -45,14 +45,22 @@ export interface AudioSpec {
   status?: string;
 }
 
-/** SEO Agent output. */
+/** SEO Agent output, including the locally-computed readability and on-page score. */
 export interface SeoSpec {
   primary_keyword?: string;
   keywords?: string[];
   meta_description?: string;
   slug?: string;
   lead_magnet?: string;
+  lead_form_fields?: string[];
   lead_cta?: string;
+  /** Flesch Reading Ease, 0-100 (higher is easier). */
+  readability?: number;
+  readability_label?: string;
+  /** Heuristic 0-100 across five checks — a drafting aid, not a ranking prediction. */
+  score?: number;
+  passed_checks?: string[];
+  suggestions?: string[];
 }
 
 export interface ContentItem {
@@ -62,6 +70,8 @@ export interface ContentItem {
   status: string;
   kind: PostKind;
   goal: string;
+  /** Follow-up parts on threaded platforms; empty for a single post. */
+  thread: string[];
   hashtags: string[];
   media: MediaRef[];
   visual: VisualSpec;

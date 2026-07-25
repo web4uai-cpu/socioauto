@@ -30,7 +30,7 @@ VISUAL_PURPOSE: dict[PostKind, str] = {
 PLATFORM_VISUAL_SPEC: dict[str, tuple[str, str]] = {
     "instagram": ("4:5", "1080x1350"),
     "tiktok": ("9:16", "1080x1920"),
-    "x": ("16:9", "1600x900"),
+    "x": ("16:9", "1200x675"),
     "linkedin": ("1.91:1", "1200x627"),
     "facebook": ("1.91:1", "1200x630"),
 }

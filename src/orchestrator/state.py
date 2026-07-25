@@ -77,6 +77,9 @@ class ContentItem:
     kind: PostKind = PostKind.IMAGE
     # Strategy goal for this item: awareness | engagement | conversion.
     goal: str = ""
+    # Follow-up parts for platforms that support threads (X). Empty means a single post;
+    # when populated, `body` is the first part.
+    thread: list[str] = field(default_factory=list)
     hashtags: list[str] = field(default_factory=list)
     media_brief: str = ""
     media: list[dict[str, str]] = field(default_factory=list)
@@ -102,6 +105,7 @@ class ContentItem:
             "body": self.body,
             "kind": self.kind.value,
             "goal": self.goal,
+            "thread": list(self.thread),
             "hashtags": list(self.hashtags),
             "media_brief": self.media_brief,
             "media": list(self.media),
@@ -125,6 +129,7 @@ class ContentItem:
             body=data.get("body", ""),
             kind=PostKind(data.get("kind", PostKind.IMAGE.value)),
             goal=data.get("goal", ""),
+            thread=list(data.get("thread", [])),
             hashtags=list(data.get("hashtags", [])),
             media_brief=data.get("media_brief", ""),
             media=list(data.get("media", [])),

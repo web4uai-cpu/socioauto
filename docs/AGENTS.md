@@ -90,10 +90,16 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Output schema**: `List[{platform, topic, format, target_date, goal}]`
 
 ## 4. Content Creation Agent
+- **File**: `src/agents/content_creation.py`
 - **Role**: Generate platform-specific copy + media brief for each calendar item.
-- **Constraints**: respects character limits (X 280, LinkedIn 3000, etc.), brand tone,
-  hashtag/style guide.
-- **Output schema**: `{platform, body, hashtags[], media_brief, cta}`
+- **Constraints**: `PLATFORM_SPECS` holds each platform's character limit, word-count target,
+  and editorial style — all fed into the prompt, so LinkedIn and TikTok do not get the same
+  copy. Instagram targets 125-150 words, LinkedIn 150-300.
+- **Threads**: where a platform supports them (X only), copy that overruns the character limit
+  is split by `split_into_thread()` into numbered `1/n` parts rather than truncated — losing
+  the end of a post is worse than posting it in two parts. Continuations go in `item.thread`;
+  `item.body` is part 1. Platforms without threads still truncate.
+- **Output schema**: `{platform, body, thread[], hashtags[], media_brief, cta}`
 
 ## 4b. Visual Agent
 - **File**: `src/agents/visual.py`
@@ -141,7 +147,19 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Also mutates**: merges its hashtags into `item.hashtags`, dedupes, and caps to the
   platform limit (`PLATFORM_HASHTAG_LIMIT`: Instagram 12, TikTok 6, LinkedIn 5, X/Facebook 3).
 - **Output schema**: `item.seo = {primary_keyword, keywords[], meta_description (≤155),
-  slug, lead_magnet, lead_cta, source}`
+  slug, lead_magnet, lead_form_fields[], lead_cta, readability, readability_label, score,
+  passed_checks[], suggestions[], source}`
+- **Scoring** ([src/seo/readability.py](../src/seo/readability.py)): `readability` is Flesch
+  Reading Ease (0-100, higher is easier) computed locally with a syllable heuristic — no
+  dependency, no API. `score` is a transparent 0-100 heuristic over five checks worth 20 each
+  (keyword present, hashtag count, CTA, readability, length), each emitting a concrete
+  suggestion when it fails, so the number is always explainable. It is a **drafting aid, not a
+  search-ranking prediction** — nothing here talks to a real SEO service.
+- **Scores the whole post**, including thread continuations, so a keyword that appears in part
+  2 still counts.
+- **Lead capture**: `lead_magnet` suggests a generic *format* matched to the campaign goal
+  (trial/demo for conversion, newsletter for awareness), never a claim that the brand offers
+  it.
 - **Guardrail**: never rewrites `item.body` — moderation must review the copy the Content
   Creation Agent produced, not an SEO rewrite of it.
 

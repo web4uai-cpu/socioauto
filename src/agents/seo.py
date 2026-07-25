@@ -10,12 +10,16 @@ from __future__ import annotations
 import re
 
 from src.agents.base import BaseAgent
+from src.agents.content_creation import spec_for
 from src.llm.provider import get_provider
 from src.orchestrator.state import CampaignState, ContentItem
+from src.seo.readability import flesch_reading_ease, readability_label, seo_score
 
 # Hashtag counts that perform on each platform; over-tagging suppresses reach on some.
+# Instagram rewards a dense tag set (AGENT_WORKFLOW.md Phase 3 targets 15-20); the others
+# do not, and stuffing them there costs reach.
 PLATFORM_HASHTAG_LIMIT: dict[str, int] = {
-    "instagram": 12,
+    "instagram": 20,
     "tiktok": 6,
     "x": 3,
     "linkedin": 5,
@@ -23,6 +27,15 @@ PLATFORM_HASHTAG_LIMIT: dict[str, int] = {
 }
 DEFAULT_HASHTAG_LIMIT = 5
 META_DESCRIPTION_LIMIT = 155
+
+# Lead-capture formats suggested by the deterministic path. These are generic *formats*, not
+# claims about anything the brand actually offers.
+_LEAD_MAGNETS_BY_GOAL: dict[str, str] = {
+    "conversion": "free trial or demo booking",
+    "engagement": "poll or AMA sign-up",
+    "awareness": "newsletter subscription",
+}
+_DEFAULT_LEAD_MAGNET = "downloadable checklist or template"
 
 SEO_SCHEMA = {
     "type": "object",
@@ -135,10 +148,33 @@ class SEOAgent(BaseAgent):
                 )
             )
             item.hashtags = [t for t in merged if t][:limit]
+
+            # Score the finished post. Done after hashtags are settled so the count is real.
+            self._score(item, limit)
             optimized += 1
 
         state.note(f"[{self.name}] optimized {optimized} items")
         return state
+
+    def _score(self, item: ContentItem, hashtag_target: int) -> None:
+        """Attach readability and a transparent on-page SEO score to `item.seo`."""
+        # Score the whole post, including any thread continuation.
+        full_text = " ".join([item.body, *item.thread])
+        readability = flesch_reading_ease(full_text)
+        result = seo_score(
+            body=full_text,
+            primary_keyword=item.seo.get("primary_keyword", ""),
+            hashtags=item.hashtags,
+            hashtag_target=hashtag_target,
+            has_cta=bool(item.cta or item.seo.get("lead_cta")),
+            readability=readability,
+            word_range=spec_for(item.platform).word_range,
+        )
+        item.seo["readability"] = readability
+        item.seo["readability_label"] = readability_label(readability)
+        item.seo["score"] = result["score"]
+        item.seo["passed_checks"] = result["passed"]
+        item.seo["suggestions"] = result["suggestions"]
 
     def _research_keywords(self, state: CampaignState) -> list[str]:
         """Keyword terms the Research Agent found for this campaign."""
@@ -194,12 +230,16 @@ class SEOAgent(BaseAgent):
             keywords = list(dict.fromkeys(words))[:6]
         primary = keywords[0] if keywords else item.topic.lower()[:40]
         body = item.body or item.topic
+        goal = item.goal or state.brief.get("goal", "")
         return {
             "primary_keyword": primary,
             "keywords": keywords,
             "hashtags": [k.replace(" ", "") for k in keywords[:3]],
             "meta_description": body[:META_DESCRIPTION_LIMIT],
-            "lead_magnet": "",
+            # A generic capture format matched to the campaign goal — never a claim that the
+            # brand actually offers this, which is why it reads as a suggestion.
+            "lead_magnet": _LEAD_MAGNETS_BY_GOAL.get(goal, _DEFAULT_LEAD_MAGNET),
+            "lead_form_fields": ["email"] if goal == "awareness" else ["name", "email"],
             "lead_cta": item.cta or "Learn more on our site.",
             "source": "fallback",
         }

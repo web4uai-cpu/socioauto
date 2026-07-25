@@ -152,6 +152,19 @@ function PostCard({ item }: { item: ContentItem }) {
       <CardBody className="space-y-4">
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{item.body}</p>
 
+        {item.thread?.length > 0 && (
+          <div className="space-y-2 border-l-2 border-brand-200 pl-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+              Thread · {item.thread.length + 1} posts
+            </p>
+            {item.thread.map((part, i) => (
+              <p key={i} className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+                {part}
+              </p>
+            ))}
+          </div>
+        )}
+
         {item.media.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {item.media.map((m) => (
@@ -242,10 +255,49 @@ function PostCard({ item }: { item: ContentItem }) {
         )}
 
         {item.seo?.primary_keyword && (
-          <Detail title="SEO" meta={[`keyword: ${item.seo.primary_keyword}`]}>
-            {item.seo.keywords?.length ? <p>{item.seo.keywords.join(" · ")}</p> : null}
-            {item.seo.meta_description && (
-              <p className="mt-2 text-slate-500">{item.seo.meta_description}</p>
+          <Detail
+            title="SEO"
+            meta={[
+              typeof item.seo.score === "number" ? `score ${item.seo.score}/100` : null,
+              item.seo.readability_label,
+            ]}
+          >
+            {typeof item.seo.score === "number" && (
+              <div className="mb-3">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      item.seo.score >= 80
+                        ? "bg-status-good"
+                        : item.seo.score >= 50
+                          ? "bg-status-warning"
+                          : "bg-status-critical"
+                    }`}
+                    style={{ width: `${item.seo.score}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            <p>
+              <span className="text-slate-400">Keyword:</span> {item.seo.primary_keyword}
+            </p>
+            {item.seo.keywords?.length ? (
+              <p className="mt-1 text-slate-500">{item.seo.keywords.join(" · ")}</p>
+            ) : null}
+            {item.seo.suggestions?.length ? (
+              <ul className="mt-2 space-y-1">
+                {item.seo.suggestions.map((s, i) => (
+                  <li key={i} className="flex gap-2 text-amber-700">
+                    <span aria-hidden>→</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-emerald-700">All checks passed.</p>
+            )}
+            {item.seo.lead_magnet && (
+              <p className="mt-2 text-slate-500">Lead capture: {item.seo.lead_magnet}</p>
             )}
           </Detail>
         )}

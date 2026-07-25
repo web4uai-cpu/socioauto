@@ -36,6 +36,8 @@ class ContentItemResponse(BaseModel):
     status: str
     kind: str = "image"
     goal: str = ""
+    # Follow-up parts for threaded platforms; empty for a single post.
+    thread: list[str] = []
     hashtags: list[str] = []
     media: list[MediaRef] = []
     # Visual/Video/Audio/SEO agent output. Empty dict when the agent skipped this item.

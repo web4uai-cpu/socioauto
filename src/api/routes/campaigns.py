@@ -53,6 +53,7 @@ def _to_response(record: CampaignRecord) -> CampaignResponse:
                 status=item.status.value,
                 kind=item.kind.value,
                 goal=item.goal,
+                thread=item.thread,
                 hashtags=item.hashtags,
                 media=item.media,
                 visual=item.visual,
