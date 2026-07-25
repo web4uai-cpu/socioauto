@@ -101,6 +101,27 @@ def run_campaign(state: CampaignState, on_agent: ProgressHook | None = None) -> 
 # and publishing are deferred to an explicit human approval step.
 PRE_APPROVAL_PIPELINE = [*GENERATION_AGENTS, ModerationAgent()]
 
+# Re-drafting an existing calendar after a reviewer rejects it. Deliberately excludes
+# input-parser/research/strategy: those *append* calendar items, so re-running them would
+# duplicate the campaign rather than redo it.
+REGENERATION_PIPELINE = [
+    ContentCreationAgent(),
+    VisualAgent(),
+    VideoAgent(),
+    AudioAgent(),
+    SEOAgent(),
+    ModerationAgent(),
+]
+
+
+def regenerate(state: CampaignState, on_agent: ProgressHook | None = None) -> CampaignState:
+    """Re-draft the existing calendar items, then re-moderate.
+
+    Callers must clear the fields they want rebuilt (`body`, `visual`, `video`, `audio`,
+    `seo`) first — every generation agent skips items that already have output.
+    """
+    return _run(REGENERATION_PIPELINE, state, on_agent)
+
 
 def run_to_moderation(state: CampaignState, on_agent: ProgressHook | None = None) -> CampaignState:
     """Run parsing → research → strategy → creation → visual → video → audio → SEO → moderation.

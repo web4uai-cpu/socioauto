@@ -169,6 +169,10 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
   (medical/financial), PII leakage.
 - **Output schema**: `{verdict: approved|rejected|needs_human, reasons[]}`
 - **Guardrail**: Publishing Agent MUST refuse content without `verdict == approved`.
+- **Re-entrant**: the gate is re-run whenever a reviewer edits an item
+  (`PATCH /campaigns/{id}/items/{index}`), so an edit can never inherit a prior approval. See
+  [AGENT_WORKFLOW.md](AGENT_WORKFLOW.md) Phase 4.
+- **`auto_publish`** skips the human review queue, never this gate.
 
 ## 6. Scheduling Agent
 - **Role**: Pick optimal send time per platform using historical analytics + audience timezone

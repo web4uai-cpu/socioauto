@@ -180,10 +180,36 @@ User options:
 └─ AUTO-APPROVE → Skip review (trusted campaigns)
 ```
 
-Implemented today: [src/agents/moderation.py](../src/agents/moderation.py) sets each item to
-`APPROVED`/`REJECTED`; `POST /api/v1/campaigns/{id}/approve` is the human trigger for the next
-phase. `EDIT` and `AUTO-APPROVE` (per-brand `auto_publish` flag) are not yet wired into the API.
-UI: [CampaignReviewQueue.tsx](../frontend/src/components/CampaignReviewQueue.tsx).
+**All four options implemented.** [moderation.py](../src/agents/moderation.py) sets each item
+to `APPROVED`/`REJECTED` before a human ever sees it.
+
+| Option | Endpoint | Behaviour |
+|---|---|---|
+| APPROVE | `POST /campaigns/{id}/approve` | Schedules and publishes the approved items. |
+| EDIT | `PATCH /campaigns/{id}/items/{index}` | Applies the edit, then **re-runs moderation on it**. |
+| REJECT | `POST /campaigns/{id}/regenerate` | Clears the generated output and re-drafts it, optionally with `feedback`. |
+| AUTO-APPROVE | `auto_publish: true` on create | Skips the human queue and publishes once moderation approves. |
+
+> 🔒 **No review action can bypass the moderation gate.**
+>
+> - **EDIT** resets the item to `PENDING_MODERATION` and re-runs the gate. Without this a
+>   reviewer could approve clean copy, edit banned content into it, and publish — which would
+>   defeat the entire gate. It also clears the SEO scores, which were computed for the old copy.
+>   Published items cannot be edited (`409`).
+> - **AUTO-APPROVE** skips the *human* queue only. Moderation has already run, rejected items
+>   stay rejected, and `PublishingAgent` still refuses anything not `APPROVED`.
+> Both properties are covered by tests in
+> [tests/test_phase4_review.py](../tests/test_phase4_review.py).
+
+**REJECT/regenerate** re-runs only `REGENERATION_PIPELINE` (content → visual → video → audio →
+SEO → moderation), deliberately **not** input-parser/research/strategy: those *append* calendar
+items, so re-running them would duplicate the campaign rather than redo it. `feedback` is passed
+to the Content Agent as `revision_notes` so the retry addresses the objection. Target one item
+with `item_index`, or omit it to redo the whole calendar; published items are skipped.
+
+UI: edit and regenerate are inline on each post card in
+[PostDetailPage.tsx](../frontend/src/pages/app/PostDetailPage.tsx); the admin queue is
+[CampaignReviewQueue.tsx](../frontend/src/components/CampaignReviewQueue.tsx).
 
 ### Phase 5: SCHEDULING & PUBLISHING (Automated)
 

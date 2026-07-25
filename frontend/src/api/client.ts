@@ -47,6 +47,16 @@ export async function apiPut<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw await failure(res, "PATCH", path);
+  return res.json() as Promise<T>;
+}
+
 /** Multipart upload — deliberately omits Content-Type so the browser sets the boundary. */
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();

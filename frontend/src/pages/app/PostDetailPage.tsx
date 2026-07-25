@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPost, API_ORIGIN } from "../../api/client";
+import { apiGet, apiPatch, apiPost, API_ORIGIN } from "../../api/client";
 import { Button } from "../../components/ui/Button";
 import { Card, CardBody, CardHeader } from "../../components/ui/Card";
+import { Input, Textarea } from "../../components/ui/Input";
 import { PostStatusBadge } from "../../components/PostStatusBadge";
 import type { Campaign, ContentItem } from "../../types/content";
 
@@ -76,7 +77,13 @@ export function PostDetailPage() {
       <div className="stagger grid gap-5 lg:grid-cols-2">
         {campaign.calendar.map((item, i) => (
           <div key={i} style={{ ["--i" as string]: i }}>
-            <PostCard item={item} />
+            <PostCard
+              item={item}
+              index={i}
+              campaignId={campaign.id}
+              onChanged={load}
+              disabled={busy}
+            />
           </div>
         ))}
       </div>
@@ -141,7 +148,53 @@ function Detail({
   );
 }
 
-function PostCard({ item }: { item: ContentItem }) {
+interface PostCardProps {
+  item: ContentItem;
+  index: number;
+  campaignId: string;
+  onChanged: () => void;
+  disabled: boolean;
+}
+
+function PostCard({ item, index, campaignId, onChanged, disabled }: PostCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.body);
+  const [feedback, setFeedback] = useState("");
+  const [working, setWorking] = useState<null | "save" | "regen">(null);
+  const [error, setError] = useState<string | null>(null);
+  const published = item.status === "published";
+
+  async function save() {
+    setWorking("save");
+    setError(null);
+    try {
+      await apiPatch(`/campaigns/${campaignId}/items/${index}`, { body: draft });
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function regenerate() {
+    setWorking("regen");
+    setError(null);
+    try {
+      await apiPost(`/campaigns/${campaignId}/regenerate`, {
+        item_index: index,
+        feedback: feedback || null,
+      });
+      setFeedback("");
+      onChanged();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setWorking(null);
+    }
+  }
+
   return (
     <Card className="h-full">
       <CardHeader
@@ -150,7 +203,31 @@ function PostCard({ item }: { item: ContentItem }) {
         action={<PostStatusBadge status={item.status} />}
       />
       <CardBody className="space-y-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{item.body}</p>
+        {editing ? (
+          <div className="space-y-2">
+            <Textarea rows={6} value={draft} onChange={(e) => setDraft(e.target.value)} />
+            <p className="text-xs text-slate-400">
+              Editing re-runs the safety review, so the status may change when you save.
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={save} loading={working === "save"}>
+                Save & re-review
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setDraft(item.body);
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{item.body}</p>
+        )}
 
         {item.thread?.length > 0 && (
           <div className="space-y-2 border-l-2 border-brand-200 pl-3">
@@ -315,6 +392,37 @@ function PostCard({ item }: { item: ContentItem }) {
               ? `Published ${new Date(item.published_at).toLocaleString()}`
               : `Scheduled for ${new Date(item.scheduled_at!).toLocaleString()}`}
           </p>
+        )}
+
+        {error && (
+          <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        {/* Reviewer actions. Published posts are final — neither edit nor regenerate applies. */}
+        {!published && !editing && (
+          <div className="space-y-2 border-t border-slate-100 pt-3">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" onClick={() => setEditing(true)} disabled={disabled}>
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={regenerate}
+                loading={working === "regen"}
+                disabled={disabled}
+              >
+                Regenerate
+              </Button>
+            </div>
+            <Input
+              placeholder="Optional: what should change when regenerating?"
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value)}
+            />
+          </div>
         )}
       </CardBody>
     </Card>

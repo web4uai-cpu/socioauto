@@ -20,6 +20,9 @@ class CampaignCreateRequest(BaseModel):
     schedule: datetime | None = None
     # Blank means "decide per platform" (see resolve_kind in orchestrator/state.py).
     post_kind: str = Field(default="", pattern=OPTIONAL_POST_KIND_PATTERN)
+    # Trusted campaigns skip the *human* review queue and publish once moderation approves.
+    # Moderation itself is never skipped.
+    auto_publish: bool = False
 
 
 class MediaRef(BaseModel):
@@ -59,6 +62,27 @@ class ManualPostCreateRequest(BaseModel):
     media: list[MediaRef] = []
     schedule: datetime | None = None
     post_kind: str = Field(default="", pattern=OPTIONAL_POST_KIND_PATTERN)
+
+
+class ItemEditRequest(BaseModel):
+    """A reviewer's edit to one calendar item. Every field is optional; omitted ones are kept.
+
+    Any edit re-opens the moderation gate — see `edit_campaign_item`.
+    """
+
+    body: str | None = Field(default=None, max_length=6000)
+    thread: list[str] | None = None
+    hashtags: list[str] | None = None
+    cta: str | None = None
+
+
+class RegenerateRequest(BaseModel):
+    """Reviewer rejection: send content back to the agents to be re-drafted."""
+
+    # Passed to the Content Agent so the retry addresses what was wrong.
+    feedback: str | None = Field(default=None, max_length=2000)
+    # Regenerate a single item; omit to redo the whole calendar.
+    item_index: int | None = Field(default=None, ge=0)
 
 
 class PipelineStage(BaseModel):
