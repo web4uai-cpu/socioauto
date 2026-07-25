@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../api/client";
+import { Button } from "./ui/Button";
+import { Card, CardBody, CardHeader } from "./ui/Card";
+import { Badge } from "./ui/Badge";
+import { CalendarIcon } from "./ui/Icon";
 
 interface ContentItem {
   platform: string;
@@ -22,11 +26,15 @@ interface Campaign {
 export function CampaignReviewQueue() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const load = () => apiGet<Campaign[]>("/campaigns").then(setCampaigns).catch(() => setCampaigns([]));
+  const load = () =>
+    apiGet<Campaign[]>("/campaigns")
+      .then(setCampaigns)
+      .catch(() => setCampaigns([]));
 
   useEffect(() => {
-    load();
+    load().finally(() => setLoading(false));
   }, []);
 
   const approve = async (id: string) => {
@@ -39,32 +47,62 @@ export function CampaignReviewQueue() {
     }
   };
 
+  const pending = campaigns.filter((c) => c.status !== "published").length;
+
   return (
-    <div className="rounded-lg border border-gray-200 p-4">
-      <h2 className="text-lg font-semibold mb-3">Campaign Review Queue</h2>
-      <ul className="space-y-3">
-        {campaigns.map((c) => (
-          <li key={c.id} className="rounded border border-gray-100 p-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-medium">{c.prompt}</p>
-                <p className="text-xs text-gray-500 capitalize">{c.status}</p>
+    <Card>
+      <CardHeader
+        title="Review queue"
+        subtitle="Approve before scheduling and publishing run"
+        icon={<CalendarIcon className="h-5 w-5" />}
+        action={
+          pending > 0 ? (
+            <Badge tone="pending_moderation">{pending} awaiting</Badge>
+          ) : (
+            <Badge tone="published">All clear</Badge>
+          )
+        }
+      />
+      <CardBody className="space-y-3">
+        {loading && <div className="skeleton h-20 w-full" />}
+
+        {!loading &&
+          campaigns.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-start justify-between gap-4 rounded-xl border border-slate-100 bg-white p-4
+                transition-all duration-200 hover:border-brand-200 hover:shadow-card"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-900">{c.prompt}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Badge tone={c.status}>{c.status.replace(/_/g, " ")}</Badge>
+                  <span className="text-xs text-slate-400">
+                    {c.calendar.length} item{c.calendar.length === 1 ? "" : "s"}
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant={c.status === "published" ? "secondary" : "primary"}
                 disabled={busyId === c.id || c.status === "published"}
+                loading={busyId === c.id}
                 onClick={() => approve(c.id)}
-                className="px-3 py-1 text-sm rounded bg-indigo-600 text-white disabled:opacity-50"
               >
-                {c.status === "published" ? "Published" : busyId === c.id ? "Approving…" : "Approve"}
-              </button>
+                {c.status === "published" ? "Published" : "Approve"}
+              </Button>
             </div>
-          </li>
-        ))}
-        {campaigns.length === 0 && (
-          <li className="py-4 text-center text-gray-400">No campaigns pending review</li>
+          ))}
+
+        {!loading && campaigns.length === 0 && (
+          <div className="py-12 text-center">
+            <p className="text-sm font-medium text-slate-500">Nothing to review</p>
+            <p className="mt-1 text-xs text-slate-400">
+              New campaigns appear here once they clear moderation.
+            </p>
+          </div>
         )}
-      </ul>
-    </div>
+      </CardBody>
+    </Card>
   );
 }

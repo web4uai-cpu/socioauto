@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiGet } from "../api/client";
+import { Card, CardBody, CardHeader } from "./ui/Card";
+import { CalendarIcon } from "./ui/Icon";
 
 interface ContentItem {
   platform: string;
@@ -25,13 +27,13 @@ interface PlannedPost extends ContentItem {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  pending_moderation: "bg-amber-100 text-amber-800",
-  approved: "bg-blue-100 text-blue-800",
-  rejected: "bg-red-100 text-red-800",
-  scheduled: "bg-indigo-100 text-indigo-800",
-  published: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  draft: "bg-slate-100 text-slate-700",
+  pending_moderation: "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200",
+  approved: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200",
+  rejected: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
+  scheduled: "bg-violet-50 text-violet-700 ring-1 ring-inset ring-violet-200",
+  published: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200",
+  failed: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200",
 };
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -67,13 +69,14 @@ function monthGrid(month: Date): Date[] {
 }
 
 function PostChip({ post }: { post: PlannedPost }) {
-  const style = STATUS_STYLES[post.status] ?? "bg-gray-100 text-gray-700";
+  const style = STATUS_STYLES[post.status] ?? "bg-slate-100 text-slate-700";
   return (
     <div
-      className={`truncate rounded px-1 py-0.5 text-xs ${style}`}
+      className={`truncate rounded-md px-1.5 py-0.5 text-[11px] transition-transform duration-150
+        hover:scale-[1.03] ${style}`}
       title={`${post.platform} — ${post.topic}\n${post.status}\n\n${post.body}`}
     >
-      <span className="font-medium uppercase">{post.platform}</span> {post.topic}
+      <span className="font-semibold uppercase">{post.platform}</span> {post.topic}
     </div>
   );
 }
@@ -129,71 +132,79 @@ export function ContentCalendar() {
     setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   }
 
-  if (loading) return <section className="rounded-lg border border-gray-200 p-4">Loading calendar…</section>;
+  if (loading) {
+    return (
+      <Card>
+        <CardBody>
+          <div className="skeleton h-72 w-full" />
+        </CardBody>
+      </Card>
+    );
+  }
+
+  const navButton =
+    "rounded-lg px-2.5 py-1.5 text-sm text-slate-600 ring-1 ring-inset ring-slate-200 " +
+    "transition-all duration-150 hover:bg-slate-50 hover:ring-slate-300 active:scale-95";
 
   return (
-    <section className="rounded-lg border border-gray-200 p-4 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Content Calendar</h2>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Previous month"
-            onClick={() => shiftMonth(-1)}
-            className="px-2 py-1 text-sm rounded border border-gray-200"
-          >
-            ←
-          </button>
-          <span className="text-sm font-medium w-40 text-center">{monthLabel}</span>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={() => shiftMonth(1)}
-            className="px-2 py-1 text-sm rounded border border-gray-200"
-          >
-            →
-          </button>
-          <button
-            type="button"
-            onClick={() => setMonth(startOfMonth(new Date()))}
-            className="ml-2 px-2 py-1 text-sm rounded border border-gray-200"
-          >
-            Today
-          </button>
-        </div>
-      </div>
-
+    <Card>
+      <CardHeader
+        title="Content calendar"
+        subtitle="Scheduled and published posts across every campaign"
+        icon={<CalendarIcon className="h-5 w-5" />}
+        action={
+          <div className="flex items-center gap-2">
+            <button type="button" aria-label="Previous month" onClick={() => shiftMonth(-1)} className={navButton}>
+              ←
+            </button>
+            <span className="w-36 text-center text-sm font-semibold text-slate-700">{monthLabel}</span>
+            <button type="button" aria-label="Next month" onClick={() => shiftMonth(1)} className={navButton}>
+              →
+            </button>
+            <button
+              type="button"
+              onClick={() => setMonth(startOfMonth(new Date()))}
+              className={`ml-1 ${navButton}`}
+            >
+              Today
+            </button>
+          </div>
+        }
+      />
+      <CardBody className="space-y-4">
       {error && (
-        <p role="alert" className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       )}
 
       <div className="overflow-x-auto">
         <div className="min-w-[42rem]">
-          <div className="grid grid-cols-7 gap-px text-xs font-medium text-gray-500">
+          <div className="grid grid-cols-7 gap-px text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="px-1 py-1">
+              <div key={day} className="px-2 py-2">
                 {day}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-gray-200">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl bg-slate-200 ring-1 ring-slate-200">
             {days.map((day) => {
               const inMonth = day.getMonth() === month.getMonth();
+              const isToday = sameDay(day, today);
               const dayPosts = posts.filter((p) => p.date && sameDay(p.date, day));
               return (
                 <div
                   key={day.toISOString()}
-                  className={`min-h-24 bg-white p-1 space-y-1 ${inMonth ? "" : "opacity-40"}`}
+                  className={`min-h-24 space-y-1 p-1.5 transition-colors duration-150 hover:bg-brand-50/50
+                    ${inMonth ? "bg-white" : "bg-slate-50/80 text-slate-300"}`}
                 >
                   <div
-                    className={`text-xs ${
-                      sameDay(day, today)
-                        ? "font-bold text-indigo-600"
-                        : "text-gray-500"
-                    }`}
+                    className={
+                      isToday
+                        ? "inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"
+                        : "text-xs font-medium text-slate-400"
+                    }
                   >
                     {day.getDate()}
                   </div>
@@ -201,7 +212,9 @@ export function ContentCalendar() {
                     <PostChip key={`${post.campaignId}-${post.platform}-${i}`} post={post} />
                   ))}
                   {dayPosts.length > 3 && (
-                    <div className="text-xs text-gray-500">+{dayPosts.length - 3} more</div>
+                    <div className="text-[11px] font-medium text-slate-400">
+                      +{dayPosts.length - 3} more
+                    </div>
                   )}
                 </div>
               );
@@ -212,10 +225,10 @@ export function ContentCalendar() {
 
       {unscheduled.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold mb-1">
+          <h3 className="mb-2 text-sm font-semibold text-slate-700">
             Unscheduled ({unscheduled.length})
           </h3>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1.5">
             {unscheduled.map((post, i) => (
               <div key={`${post.campaignId}-${i}`} className="max-w-xs">
                 <PostChip post={post} />
@@ -226,8 +239,9 @@ export function ContentCalendar() {
       )}
 
       {posts.length === 0 && !error && (
-        <p className="py-4 text-center text-gray-400">No content planned yet</p>
+        <p className="py-8 text-center text-sm text-slate-400">No content planned yet</p>
       )}
-    </section>
+      </CardBody>
+    </Card>
   );
 }

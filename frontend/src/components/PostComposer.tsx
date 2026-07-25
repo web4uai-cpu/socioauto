@@ -2,10 +2,19 @@ import { useState } from "react";
 import { apiPost } from "../api/client";
 import { Button } from "./ui/Button";
 import { Card, CardBody, CardHeader } from "./ui/Card";
-import { Input, Textarea } from "./ui/Input";
+import { Field, Input, Textarea } from "./ui/Input";
 import { MediaUploader, type MediaRef } from "./MediaUploader";
+import { PenIcon, SparkleIcon } from "./ui/Icon";
 
-const PLATFORMS = ["instagram", "x", "linkedin", "facebook", "tiktok"];
+const PLATFORMS = [
+  { id: "instagram", label: "Instagram", tone: "from-pink-500 to-orange-400" },
+  { id: "x", label: "X", tone: "from-slate-700 to-slate-900" },
+  { id: "linkedin", label: "LinkedIn", tone: "from-brand-500 to-brand-700" },
+  { id: "facebook", label: "Facebook", tone: "from-brand-400 to-brand-600" },
+  { id: "tiktok", label: "TikTok", tone: "from-teal-400 to-slate-800" },
+];
+
+const MAX_BODY = 4000;
 
 interface CampaignResponse {
   id: string;
@@ -61,71 +70,171 @@ export function PostComposer({ onCreated }: PostComposerProps) {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">New post</h2>
-        <div className="flex overflow-hidden rounded-lg border border-gray-300 text-sm">
-          <button
-            type="button"
-            onClick={() => setMode("manual")}
-            className={`px-3 py-1.5 ${mode === "manual" ? "bg-brand-600 text-white" : "bg-white text-gray-600"}`}
-          >
-            Write it myself
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("ai")}
-            className={`px-3 py-1.5 ${mode === "ai" ? "bg-brand-600 text-white" : "bg-white text-gray-600"}`}
-          >
-            Generate with AI
-          </button>
-        </div>
-      </CardHeader>
-
-      <CardBody className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          {PLATFORMS.map((platform) => (
-            <button
-              key={platform}
-              type="button"
-              onClick={() => togglePlatform(platform)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                platforms.includes(platform)
-                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                  : "border-gray-300 text-gray-500"
-              }`}
-            >
-              {platform}
-            </button>
-          ))}
-        </div>
-
-        <Textarea
-          rows={4}
-          placeholder={mode === "manual" ? "What do you want to post?" : "Describe what to post about…"}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Card accent="from-brand-400 via-series-3 to-series-2">
+        <CardHeader
+          title="Create a post"
+          subtitle="Everything goes through brand-safety review before it publishes"
+          icon={mode === "manual" ? <PenIcon className="h-5 w-5" /> : <SparkleIcon className="h-5 w-5" />}
+          action={
+            <div className="flex rounded-xl bg-slate-100 p-1">
+              {(["manual", "ai"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                    mode === m
+                      ? "bg-white text-brand-700 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {m === "manual" ? "Write it myself" : "Generate with AI"}
+                </button>
+              ))}
+            </div>
+          }
         />
 
-        {mode === "manual" && (
-          <>
-            <Input placeholder="Call to action (optional)" value={cta} onChange={(e) => setCta(e.target.value)} />
-            <MediaUploader media={media} onChange={setMedia} />
-          </>
-        )}
+        <CardBody className="space-y-6">
+          <Field label="Platforms" hint="Each selected platform gets its own reviewed post.">
+            <div className="flex flex-wrap gap-2">
+              {PLATFORMS.map((platform) => {
+                const on = platforms.includes(platform.id);
+                return (
+                  <button
+                    key={platform.id}
+                    type="button"
+                    onClick={() => togglePlatform(platform.id)}
+                    className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium
+                      transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
+                        on
+                          ? "bg-brand-50 text-brand-700 ring-2 ring-inset ring-brand-500"
+                          : "bg-white text-slate-600 ring-1 ring-inset ring-slate-200 hover:ring-slate-300"
+                      }`}
+                  >
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full bg-gradient-to-br ${platform.tone} ${
+                        on ? "" : "opacity-40"
+                      }`}
+                    />
+                    {platform.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
 
-        {error && (
-          <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-            {error}
-          </p>
-        )}
+          <Field
+            label={mode === "manual" ? "Your post" : "What should it be about?"}
+            htmlFor="composer-body"
+            action={
+              <span
+                className={`text-xs tabular-nums ${
+                  body.length > MAX_BODY ? "text-status-critical" : "text-slate-400"
+                }`}
+              >
+                {body.length}/{MAX_BODY}
+              </span>
+            }
+          >
+            <Textarea
+              id="composer-body"
+              rows={7}
+              maxLength={MAX_BODY}
+              placeholder={
+                mode === "manual"
+                  ? "Share what's new…"
+                  : "e.g. Announce our new AI feature to enterprise buyers"
+              }
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+            />
+          </Field>
 
-        <div className="flex justify-end">
-          <Button onClick={submit} disabled={busy}>
-            {busy ? "Submitting…" : mode === "manual" ? "Submit for review" : "Generate & review"}
-          </Button>
-        </div>
-      </CardBody>
-    </Card>
+          {mode === "manual" && (
+            <>
+              <Field label="Call to action" htmlFor="composer-cta" hint="Optional.">
+                <Input
+                  id="composer-cta"
+                  placeholder="e.g. Book a demo"
+                  value={cta}
+                  onChange={(e) => setCta(e.target.value)}
+                />
+              </Field>
+
+              <Field label="Media" hint="Photo, audio, or video — attach as many as you need.">
+                <MediaUploader media={media} onChange={setMedia} />
+              </Field>
+            </>
+          )}
+
+          {error && (
+            <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 border-t border-slate-100 pt-5">
+            <Button
+              size="lg"
+              onClick={submit}
+              loading={busy}
+              icon={mode === "ai" ? <SparkleIcon className="h-4 w-4" /> : undefined}
+            >
+              {mode === "manual" ? "Submit for review" : "Generate & review"}
+            </Button>
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Live preview */}
+      <div className="xl:sticky xl:top-24 xl:self-start">
+        <Card>
+          <CardHeader title="Preview" subtitle="Roughly how it will read" />
+          <CardBody>
+            <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-semibold text-white">
+                  A
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Your brand</p>
+                  <p className="text-xs text-slate-400">
+                    {platforms.length > 0 ? platforms.join(" · ") : "No platform selected"}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-700">
+                {body || (
+                  <span className="text-slate-400">Your post text will appear here…</span>
+                )}
+              </p>
+
+              {cta && (
+                <p className="mt-3 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">
+                  {cta}
+                </p>
+              )}
+
+              {media.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {media.slice(0, 4).map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex h-16 items-center justify-center rounded-lg bg-slate-200 text-[11px]
+                        font-medium uppercase tracking-wide text-slate-500"
+                    >
+                      {m.kind}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
+      </div>
+    </div>
   );
 }

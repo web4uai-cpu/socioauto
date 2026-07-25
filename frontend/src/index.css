@@ -1,3 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-plane text-[#0b0b0b];
+  }
+
+  /* Recessive, enterprise-looking scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd2e1 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: #cbd2e1;
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #aeb7ca;
+  }
+}
+
+@layer components {
+  /* Staggered entrance for grids of cards — set --d per child. */
+  .stagger > * {
+    @apply animate-fade-up;
+    animation-delay: calc(var(--i, 0) * 60ms);
+  }
+
+  /* Skeleton shimmer used by loading states. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-slate-200/70;
+  }
+  .skeleton::after {
+    @apply absolute inset-0 animate-shimmer;
+    content: "";
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+    transform: translateX(-100%);
+  }
+}

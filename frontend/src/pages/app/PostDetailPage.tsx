@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPost, API_ORIGIN } from "../../api/client";
 import { Button } from "../../components/ui/Button";
-import { Card, CardBody } from "../../components/ui/Card";
+import { Card, CardBody, CardHeader } from "../../components/ui/Card";
 import { PostStatusBadge } from "../../components/PostStatusBadge";
-import type { Campaign } from "../../types/content";
+import type { Campaign, ContentItem } from "../../types/content";
 
 export function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,12 +22,12 @@ export function PostDetailPage() {
 
   useEffect(load, [id]);
 
-  async function approveAndPublish() {
+  async function act(path: string) {
     if (!id) return;
     setBusy(true);
     setError(null);
     try {
-      await apiPost(`/campaigns/${id}/approve`);
+      await apiPost(`/campaigns/${id}/${path}`);
       load();
     } catch (err) {
       setError((err as Error).message);
@@ -36,76 +36,52 @@ export function PostDetailPage() {
     }
   }
 
-  async function scheduleForLater() {
-    if (!id) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await apiPost(`/campaigns/${id}/schedule`);
-      load();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (error)
+  if (error && !campaign) {
     return (
-      <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
         {error}
       </p>
     );
-  if (!campaign) return <p className="text-sm text-gray-500">Loading…</p>;
+  }
+  if (!campaign) {
+    return (
+      <Card>
+        <CardBody className="space-y-3">
+          <div className="skeleton h-6 w-40" />
+          <div className="skeleton h-24 w-full" />
+        </CardBody>
+      </Card>
+    );
+  }
 
   const anyApproved = campaign.calendar.some((item) => item.status === "approved");
   const anyRejected = campaign.calendar.some((item) => item.status === "rejected");
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <button
         type="button"
         onClick={() => navigate("/app/posts")}
-        className="text-sm text-gray-500 hover:text-gray-800"
+        className="text-sm font-medium text-slate-500 transition-colors hover:text-brand-600"
       >
         ← Back to my posts
       </button>
 
-      {campaign.calendar.map((item, i) => (
-        <Card key={i}>
-          <CardBody className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium capitalize">{item.platform}</span>
-              <PostStatusBadge status={item.status} />
-            </div>
-            <p className="whitespace-pre-wrap text-sm text-gray-800">{item.body}</p>
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
-            {item.media.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {item.media.map((m) => (
-                  <div key={m.id} className="rounded-lg border border-gray-200 p-1">
-                    {m.kind === "image" && (
-                      <img src={`${API_ORIGIN}${m.url}`} alt="" className="h-24 w-full rounded object-cover" />
-                    )}
-                    {m.kind === "audio" && <audio src={`${API_ORIGIN}${m.url}`} controls className="w-full" />}
-                    {m.kind === "video" && (
-                      <video src={`${API_ORIGIN}${m.url}`} controls className="h-24 w-full rounded object-cover" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+      <div className="stagger grid gap-5 lg:grid-cols-2">
+        {campaign.calendar.map((item, i) => (
+          <div key={i} style={{ ["--i" as string]: i }}>
+            <PostCard item={item} />
+          </div>
+        ))}
+      </div>
 
-            {item.status === "rejected" && item.moderation_reasons.length > 0 && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-                Rejected: {item.moderation_reasons.join(", ")}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      ))}
-
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-3">
         {anyRejected && (
           <Button variant="secondary" onClick={() => navigate("/app/compose")}>
             Edit & resubmit
@@ -113,15 +89,68 @@ export function PostDetailPage() {
         )}
         {anyApproved && (
           <>
-            <Button variant="secondary" onClick={scheduleForLater} disabled={busy}>
+            <Button variant="secondary" onClick={() => act("schedule")} disabled={busy}>
               Schedule for later
             </Button>
-            <Button onClick={approveAndPublish} disabled={busy}>
+            <Button onClick={() => act("approve")} loading={busy}>
               Publish now
             </Button>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+function PostCard({ item }: { item: ContentItem }) {
+  return (
+    <Card className="h-full">
+      <CardHeader
+        title={<span className="capitalize">{item.platform}</span>}
+        action={<PostStatusBadge status={item.status} />}
+      />
+      <CardBody className="space-y-4">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{item.body}</p>
+
+        {item.media.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {item.media.map((m) => (
+              <div key={m.id} className="overflow-hidden rounded-xl ring-1 ring-slate-200">
+                {m.kind === "image" && (
+                  <img src={`${API_ORIGIN}${m.url}`} alt="" className="h-28 w-full object-cover" />
+                )}
+                {m.kind === "audio" && (
+                  <div className="flex h-28 items-center bg-slate-50 px-2">
+                    <audio src={`${API_ORIGIN}${m.url}`} controls className="w-full" />
+                  </div>
+                )}
+                {m.kind === "video" && (
+                  <video
+                    src={`${API_ORIGIN}${m.url}`}
+                    controls
+                    className="h-28 w-full bg-slate-900 object-cover"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {item.status === "rejected" && item.moderation_reasons.length > 0 && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <p className="font-semibold">Rejected by brand-safety review</p>
+            <p className="mt-1">{item.moderation_reasons.join(", ")}</p>
+          </div>
+        )}
+
+        {(item.scheduled_at || item.published_at) && (
+          <p className="border-t border-slate-100 pt-3 text-xs text-slate-400">
+            {item.published_at
+              ? `Published ${new Date(item.published_at).toLocaleString()}`
+              : `Scheduled for ${new Date(item.scheduled_at!).toLocaleString()}`}
+          </p>
+        )}
+      </CardBody>
+    </Card>
   );
 }

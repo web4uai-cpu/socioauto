@@ -25,10 +25,18 @@ export function PostsPage() {
     };
   }, []);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading your posts…</p>;
+  if (loading) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="skeleton h-32 w-full" />
+        ))}
+      </div>
+    );
+  }
   if (error)
     return (
-      <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+      <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
         {error}
       </p>
     );

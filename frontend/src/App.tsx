@@ -43,7 +43,14 @@ export function App() {
   }
 
   if (role === null) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-gray-500">Loading…</div>;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-plane">
+        <span className="flex h-12 w-12 animate-pulse items-center justify-center rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 text-xl font-black text-white shadow-glow">
+          S
+        </span>
+        <p className="text-sm text-slate-400">Preparing your workspace…</p>
+      </div>
+    );
   }
 
   return (
