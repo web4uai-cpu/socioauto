@@ -1,4 +1,5 @@
 """Analytics Agent: collects performance metrics and feeds back into strategy."""
+
 from __future__ import annotations
 
 from src.agents.base import BaseAgent

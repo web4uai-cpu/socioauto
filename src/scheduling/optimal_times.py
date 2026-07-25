@@ -4,6 +4,7 @@ Preferred posting hours (UTC) are drawn from widely published engagement heurist
 platform. ``next_optimal_slot`` finds the next preferred hour at or after a given moment; the
 Scheduling Agent uses it to space a campaign's posts across upcoming optimal windows.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

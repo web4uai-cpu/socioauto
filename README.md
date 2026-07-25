@@ -28,8 +28,12 @@ scaling strategy, and [docs/AGENTS.md](docs/AGENTS.md) for each agent's prompt/s
 - **Orchestration**: LangGraph-style agent graph (`src/orchestrator`)
 - **Queue/Scheduling**: Redis + Celery (or APScheduler for local dev)
 - **Storage**: PostgreSQL (metadata), S3-compatible bucket (media assets)
-- **LLM**: Pluggable provider interface (`src/llm/provider.py`) — OpenAI/Anthropic/local
+- **LLM**: Pluggable provider interface (`src/llm/provider.py`) — Anthropic (Claude), with a
+  deterministic no-LLM fallback so the pipeline runs without credentials
 - **Platform APIs**: X API v2, Meta Graph API, LinkedIn API, TikTok Content API
+- **Billing**: Stripe Checkout + signature-verified webhook sync (`src/billing/`)
+- **Configuration**: integration keys are settable from the admin dashboard and stored
+  AES-256-GCM encrypted (`src/runtime_config.py`), overriding environment variables
 
 ## Project Layout
 
@@ -38,7 +42,9 @@ social_media_ai_agent/
 ├── README.md
 ├── docs/
 │   ├── SYSTEM_DESIGN.md
-│   └── AGENTS.md
+│   ├── AGENTS.md
+│   ├── WORKFLOW.md         # end-to-end product workflow spec
+│   └── DEPLOYMENT.md       # Railway/k8s deploy + configuration guide
 ├── .claude/                # Claude Code project config
 │   ├── CLAUDE.md           # persistent project memory/instructions
 │   ├── settings.json       # hooks configuration
@@ -67,7 +73,9 @@ pip install -r requirements.txt
 
 # 2. Configure environment
 copy config\settings.example.env .env
-# fill in LLM + platform API keys
+# Only DATABASE_URL, REDIS_URL, JWT_SECRET_KEY and APP_ENCRYPTION_KEY are required here —
+# LLM, Stripe, and platform keys can instead be entered in the dashboard's Integrations
+# panel once the API is running. Without an LLM key the agents produce placeholder copy.
 
 # 3. Run the API
 uvicorn src.api.main:app --reload

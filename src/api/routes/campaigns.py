@@ -1,4 +1,5 @@
 """Campaign endpoints: create from natural language, fetch, and human-in-the-loop approval."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -192,9 +193,11 @@ def approve_campaign(
     state = SchedulingAgent().run(record.state)
     state = PublishingAgent().run(state)
     record.state = state
-    record.status = "published" if any(
-        item.status == ContentStatus.PUBLISHED for item in state.calendar
-    ) else record.status
+    record.status = (
+        "published"
+        if any(item.status == ContentStatus.PUBLISHED for item in state.calendar)
+        else record.status
+    )
     campaigns_repo.save(db, record)
     audit.record(
         db,

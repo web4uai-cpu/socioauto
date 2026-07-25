@@ -1,4 +1,5 @@
 """Due-post publishing: publish scheduled items whose time has arrived."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -38,7 +39,5 @@ def publish_due_items(
         except PlatformHttpError as exc:
             item.status = ContentStatus.FAILED
             state.note(f"[scheduler] publish failed for {item.platform}: {exc}")
-            logger.error(
-                "due publish failed", extra={"platform": item.platform, "error": str(exc)}
-            )
+            logger.error("due publish failed", extra={"platform": item.platform, "error": str(exc)})
     return published

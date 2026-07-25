@@ -3,6 +3,7 @@
 SECRET_KEY must come from the environment in production — the default below is only for
 local/dev convenience and must never be used in a deployed environment.
 """
+
 from __future__ import annotations
 
 import os

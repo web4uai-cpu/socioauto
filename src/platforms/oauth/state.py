@@ -4,6 +4,7 @@ The ``state`` passed to the provider is a short-lived signed JWT binding the flo
 initiating user, platform, and (for PKCE) the code verifier. On callback we verify the
 signature, so no server-side session store is required.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

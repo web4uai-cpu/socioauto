@@ -12,6 +12,7 @@ from src.api.main import app
 from src.platforms import clients, http_client
 from src.platforms.circuit_breaker import CircuitBreaker, CircuitOpenError
 from src.platforms.http_client import PlatformHttpError
+from src.runtime_config import invalidate_cache
 
 client = TestClient(app)
 
@@ -67,13 +68,15 @@ def test_meta_webhook_rejects_bad_signature():
 
 def test_meta_webhook_accepts_valid_signature(monkeypatch):
     monkeypatch.setenv("META_APP_SECRET", "shh")
+    invalidate_cache()
     body = json.dumps({"entry": []}).encode()
     sig = hmac.new(b"shh", body, hashlib.sha256).hexdigest()
     resp = client.post(
         "/webhooks/meta", content=body, headers={"X-Hub-Signature-256": f"sha256={sig}"}
     )
     assert resp.status_code == 200
-    assert resp.json() == {"status": "accepted"}
+    # No entries in the payload, so nothing is queued for the Engagement Agent.
+    assert resp.json() == {"status": "accepted", "queued": 0}
 
 
 def test_connected_account_token_reaches_real_publish(monkeypatch):

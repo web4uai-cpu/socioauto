@@ -5,6 +5,7 @@ Usage:
     logger = get_logger(__name__)
     logger.info("campaign created", extra={"campaign_id": campaign_id})
 """
+
 from __future__ import annotations
 
 import json

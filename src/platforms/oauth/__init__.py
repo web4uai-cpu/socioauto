@@ -5,6 +5,7 @@ Public surface:
 - ``OAuthTokens`` -> exchanged/refreshed token bundle
 - ``sign_state`` / ``verify_state`` -> CSRF-safe, stateless OAuth ``state`` handling
 """
+
 from __future__ import annotations
 
 from src.platforms.oauth.provider import (

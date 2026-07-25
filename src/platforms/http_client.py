@@ -3,6 +3,7 @@
 Every outbound call to a third-party platform API must go through this module so timeouts,
 TLS verification, and exponential-backoff retries are enforced uniformly (per .claude/CLAUDE.md).
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -57,9 +58,7 @@ def request_json(
         PlatformTransientError: On 429/5xx after retries are exhausted.
     """
     with httpx.Client(timeout=DEFAULT_TIMEOUT, verify=True) as client:
-        response = client.request(
-            method, url, headers=headers, params=params, data=data, json=json
-        )
+        response = client.request(method, url, headers=headers, params=params, data=data, json=json)
     _raise_for_status(response)
     return response.json() if response.content else {}
 

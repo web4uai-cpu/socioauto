@@ -5,6 +5,7 @@ agent pipeline). Each calendar item is also projected into a ``Post`` row so ana
 reporting can run real relational queries. The projection is rebuilt on every save, so the
 two representations never diverge.
 """
+
 from __future__ import annotations
 
 import uuid

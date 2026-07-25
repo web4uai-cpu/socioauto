@@ -1,4 +1,5 @@
 """Config-driven OAuth2 authorization-code provider (with optional PKCE)."""
+
 from __future__ import annotations
 
 import base64

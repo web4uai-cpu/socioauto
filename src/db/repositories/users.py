@@ -1,4 +1,5 @@
 """User persistence: self-provisioned principals + admin-managed users."""
+
 from __future__ import annotations
 
 import uuid

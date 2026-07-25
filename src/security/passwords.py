@@ -2,6 +2,7 @@
 
 Format stored in ``users.hashed_password``: ``pbkdf2_sha256$<iterations>$<salt_hex>$<hash_hex>``.
 """
+
 from __future__ import annotations
 
 import hashlib

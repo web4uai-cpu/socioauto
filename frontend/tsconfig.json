@@ -9,7 +9,10 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    // Vite owns the build; tsc runs as a type-checker only and must not emit .js
+    // files alongside the sources.
+    "noEmit": true
   },
   "include": ["src"]
 }

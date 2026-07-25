@@ -3,6 +3,7 @@
 Tables: users, social_accounts, campaigns, posts, analytics, subscriptions, invoices.
 Mirrors config/db/migrations/001_init.sql — keep both in sync when the schema changes.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -73,9 +74,7 @@ class SocialAccount(Base):
     display_name: Mapped[str | None] = mapped_column(String(255))
     # Never store raw secrets here — only a pointer into the secrets manager.
     credentials_ref: Mapped[str] = mapped_column(String(255), nullable=False)
-    connected_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
-    )
+    connected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     __table_args__ = (
         CheckConstraint(
@@ -164,9 +163,7 @@ class Analytics(Base):
     shares: Mapped[int] = mapped_column(BigInteger, default=0)
     comments: Mapped[int] = mapped_column(BigInteger, default=0)
     clicks: Mapped[int] = mapped_column(BigInteger, default=0)
-    captured_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
-    )
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     post: Mapped["Post"] = relationship(back_populates="analytics")
 
@@ -236,6 +233,55 @@ class AuditLog(Base):
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[str | None] = mapped_column(String(64))
     details: Mapped[dict] = mapped_column(JsonDocument, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utcnow
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
+class Engagement(Base):
+    """An inbound mention, comment, or DM received from a platform webhook.
+
+    Rows are the Engagement Agent's work queue: the webhook records them synchronously
+    (so nothing is lost if the worker is down), and a Celery task drafts a reply and flags
+    escalations afterwards. `external_id` is unique so replayed webhook deliveries — which
+    every platform performs — cannot create duplicates.
+    """
+
+    __tablename__ = "engagements"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    platform: Mapped[str] = mapped_column(String(30), nullable=False)
+    external_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="mention")
+    author: Mapped[str | None] = mapped_column(String(255))
+    message: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    draft_response: Mapped[str | None] = mapped_column(Text)
+    escalated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        CheckConstraint("kind IN ('mention','comment','dm')", name="ck_engagements_kind"),
+        CheckConstraint(
+            "status IN ('pending','drafted','escalated','responded')",
+            name="ck_engagements_status",
+        ),
+    )
+
+
+class AppSetting(Base):
+    """Runtime configuration set from the admin dashboard, overriding environment defaults.
+
+    Values are always stored AES-256-GCM encrypted (`src/security/crypto.py`) because most
+    of them are third-party API keys. Secret values are never returned by the API — only a
+    masked preview — so the dashboard can show what is configured without re-exposing it.
+    """
+
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+    is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    updated_by: Mapped[str | None] = mapped_column(String(320))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
     )

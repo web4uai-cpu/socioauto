@@ -3,6 +3,7 @@
 Client IDs/secrets are never hardcoded — they are read from the environment at request time
 (names below). Endpoints/scopes match each platform's public OAuth2 documentation.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

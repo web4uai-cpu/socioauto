@@ -1,4 +1,5 @@
 """Analytics dashboard endpoint: aggregate rollup across all campaigns."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends

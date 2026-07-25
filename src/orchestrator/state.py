@@ -1,4 +1,5 @@
 """Campaign state shared across all agents in the orchestration graph."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

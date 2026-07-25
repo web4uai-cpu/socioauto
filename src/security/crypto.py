@@ -4,6 +4,7 @@ Used by the accounts.connect endpoint so raw social-platform credentials are nev
 in plaintext — only the resulting ciphertext (`credentials_ref`) is stored, per the mandatory
 rule in .claude/CLAUDE.md.
 """
+
 from __future__ import annotations
 
 import base64

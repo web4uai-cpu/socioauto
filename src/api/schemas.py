@@ -1,4 +1,5 @@
 """Pydantic request/response models for the v1 API. Validates every API boundary input."""
+
 from __future__ import annotations
 
 from datetime import datetime

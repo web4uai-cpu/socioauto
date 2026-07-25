@@ -1,4 +1,5 @@
 """FastAPI app exposing the social media automation platform's API."""
+
 from __future__ import annotations
 
 import os
@@ -10,7 +11,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.api.routes import accounts, analytics, auth, billing, campaigns, users, webhooks
+from src.api.routes import (
+    accounts,
+    analytics,
+    auth,
+    billing,
+    campaigns,
+    settings,
+    users,
+    webhooks,
+)
 from src.db.models import Base
 from src.db.session import engine
 from src.orchestrator.graph import run_campaign
@@ -37,7 +47,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Account-Tier"],
 )
 
@@ -49,6 +59,7 @@ app.include_router(accounts.router)
 app.include_router(accounts.callback_router)  # OAuth redirect target (no bearer auth)
 app.include_router(users.router)
 app.include_router(billing.router)
+app.include_router(settings.router)
 app.include_router(webhooks.router)
 
 

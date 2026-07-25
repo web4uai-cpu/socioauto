@@ -1,6 +1,7 @@
 """Basic user management & roles (admin). Backed by the in-memory store today — swap for
 real `users` table queries (src/db/models.py) once src/db/session.py is wired into routes.
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -64,9 +65,7 @@ def create_user(
             detail=f"role must be one of {sorted(ALLOWED_ROLES)}",
         )
     try:
-        record = users_repo.create(
-            db, email=req.email, full_name=req.full_name, role=req.role
-        )
+        record = users_repo.create(db, email=req.email, full_name=req.full_name, role=req.role)
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(
@@ -108,7 +107,5 @@ def update_user_role(
         entity_id=target_user_id,
         details={"new_role": req.role},
     )
-    logger.info(
-        "user role updated", extra={"user_id": target_user_id, "new_role": req.role}
-    )
+    logger.info("user role updated", extra={"user_id": target_user_id, "new_role": req.role})
     return UserResponse(**record)

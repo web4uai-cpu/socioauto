@@ -1,4 +1,5 @@
 """Analytics rollups computed with real relational queries over the Post projection."""
+
 from __future__ import annotations
 
 import uuid

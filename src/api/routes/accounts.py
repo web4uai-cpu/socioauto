@@ -1,5 +1,6 @@
 """Connect a social media platform account. Raw API keys are AES-256-GCM encrypted before
 being stored — only the ciphertext (`credentials_ref`) is ever persisted or returned."""
+
 from __future__ import annotations
 
 import json
@@ -110,9 +111,7 @@ def connect_account(
 
 
 @router.get("/{platform}/authorize")
-def start_oauth(
-    platform: str, current_user: User = Depends(get_current_user)
-) -> dict[str, str]:
+def start_oauth(platform: str, current_user: User = Depends(get_current_user)) -> dict[str, str]:
     """Begin the OAuth2 authorization-code flow: return the provider consent URL to redirect to.
 
     The returned ``state`` is a signed token binding the flow to this user (and PKCE verifier),
@@ -121,16 +120,12 @@ def start_oauth(
     try:
         provider = get_provider(platform)
     except UnknownPlatform as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     code_verifier = code_challenge = None
     if provider.config.use_pkce:
         code_verifier, code_challenge = generate_pkce_pair()
-    state = sign_state(
-        user_id=str(current_user.id), platform=platform, code_verifier=code_verifier
-    )
+    state = sign_state(user_id=str(current_user.id), platform=platform, code_verifier=code_verifier)
     try:
         url = provider.authorization_url(
             state=state,

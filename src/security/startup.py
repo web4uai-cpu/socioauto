@@ -1,4 +1,5 @@
 """Startup security checks: refuse to boot a production deployment with insecure defaults."""
+
 from __future__ import annotations
 
 import os

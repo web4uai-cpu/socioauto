@@ -3,6 +3,7 @@
 A simple in-process breaker: after ``failure_threshold`` consecutive failures the circuit
 opens and calls fast-fail for ``reset_timeout`` seconds, then allows a trial call (half-open).
 """
+
 from __future__ import annotations
 
 import threading

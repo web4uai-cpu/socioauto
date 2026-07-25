@@ -1,4 +1,5 @@
 """Append-only audit-log writes for compliance (docs/SYSTEM_DESIGN.md §5)."""
+
 from __future__ import annotations
 
 from typing import Any

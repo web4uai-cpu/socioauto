@@ -1,4 +1,5 @@
 """Base interface every agent implements: pure function over CampaignState."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

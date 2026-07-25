@@ -4,6 +4,7 @@ Slow LLM/agent work runs off the request thread so the API stays responsive (SYS
 Without a broker configured (local/dev/tests) tasks run eagerly in-process, so callers get the
 same behavior without needing Redis.
 """
+
 from __future__ import annotations
 
 import os
@@ -60,9 +61,7 @@ def run_campaign_task(campaign_id: str, actor_email: str) -> dict:
 
         logger.info("campaign task started", extra={"campaign_id": campaign_id})
         record.state = run_to_moderation(record.state)
-        any_approved = any(
-            item.status == ContentStatus.APPROVED for item in record.state.calendar
-        )
+        any_approved = any(item.status == ContentStatus.APPROVED for item in record.state.calendar)
         record.status = "pending_review" if any_approved else "needs_revision"
         campaigns_repo.save(db, record)
         audit.record(
@@ -78,6 +77,35 @@ def run_campaign_task(campaign_id: str, actor_email: str) -> dict:
             extra={"campaign_id": campaign_id, "status": record.status},
         )
         return {"campaign_id": campaign_id, "status": record.status}
+    finally:
+        db.close()
+
+
+@celery_app.task(name="engagement.process_inbound")
+def process_inbound_engagement(engagement_id: str) -> dict:
+    """Draft a reply for one inbound engagement, or flag it for a human.
+
+    Enqueued by the platform webhook handlers after the row is persisted, so a worker
+    outage delays drafting but never loses the message.
+    """
+    from src.agents.engagement import EngagementAgent
+    from src.db.repositories import engagements as engagements_repo
+    from src.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        engagement = engagements_repo.get(db, uuid.UUID(engagement_id))
+        if engagement is None:
+            logger.error("engagement not found", extra={"engagement_id": engagement_id})
+            return {"engagement_id": engagement_id, "status": "not_found"}
+
+        draft, escalated = EngagementAgent().draft_reply(engagement.message)
+        engagements_repo.save_draft(db, engagement, draft=draft, escalated=escalated)
+        logger.info(
+            "engagement processed",
+            extra={"engagement_id": engagement_id, "escalated": escalated},
+        )
+        return {"engagement_id": engagement_id, "status": engagement.status}
     finally:
         db.close()
 

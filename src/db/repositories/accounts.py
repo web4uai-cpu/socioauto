@@ -1,4 +1,5 @@
 """Connected social-platform account persistence."""
+
 from __future__ import annotations
 
 import json
@@ -48,9 +49,7 @@ def create(
 
 
 def for_user(db: Session, user_id: uuid.UUID) -> list[dict[str, Any]]:
-    rows = db.execute(
-        select(SocialAccount).where(SocialAccount.user_id == user_id)
-    ).scalars().all()
+    rows = db.execute(select(SocialAccount).where(SocialAccount.user_id == user_id)).scalars().all()
     return [_to_dict(a) for a in rows]
 
 
@@ -79,9 +78,7 @@ def access_tokens_for_user(db: Session, user_id: uuid.UUID) -> dict[str, str]:
 
     Tokens are decrypted transiently for the publish call and never persisted or logged.
     """
-    rows = db.execute(
-        select(SocialAccount).where(SocialAccount.user_id == user_id)
-    ).scalars().all()
+    rows = db.execute(select(SocialAccount).where(SocialAccount.user_id == user_id)).scalars().all()
     tokens: dict[str, str] = {}
     for account in rows:
         token = _extract_access_token(account.credentials_ref)

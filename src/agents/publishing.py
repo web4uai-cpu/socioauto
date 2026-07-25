@@ -1,4 +1,5 @@
 """Publishing Agent: calls platform APIs for scheduled+approved content only."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -45,7 +46,5 @@ class PublishingAgent(BaseAgent):
             except PlatformHttpError as exc:
                 item.status = ContentStatus.FAILED
                 state.note(f"[{self.name}] publish failed for {item.platform}: {exc}")
-                logger.error(
-                    "publish failed", extra={"platform": item.platform, "error": str(exc)}
-                )
+                logger.error("publish failed", extra={"platform": item.platform, "error": str(exc)})
         return state

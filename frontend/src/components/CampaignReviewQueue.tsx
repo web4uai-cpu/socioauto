@@ -17,7 +17,7 @@ interface Campaign {
 
 /**
  * Human-in-the-loop review queue: campaigns awaiting approval before Scheduling/Publishing run.
- * Backed by GET /api/v1/campaigns (TODO: list endpoint) and POST /api/v1/campaigns/{id}/approve.
+ * Backed by GET /api/v1/campaigns and POST /api/v1/campaigns/{id}/approve.
  */
 export function CampaignReviewQueue() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);

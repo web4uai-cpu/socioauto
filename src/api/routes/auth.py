@@ -4,6 +4,7 @@ Passwords are verified against the ``users`` table (PBKDF2, see src/security/pas
 Tokens carry the user's email as ``sub`` so admin gating (ADMIN_EMAILS) and principal
 resolution stay email-based.
 """
+
 from __future__ import annotations
 
 from typing import Annotated

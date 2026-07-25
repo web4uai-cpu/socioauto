@@ -8,6 +8,7 @@ When no ``access_token`` is supplied (local/demo runs without connected credenti
 operate in **simulate** mode and return a synthetic external id, so the orchestrator pipeline
 remains runnable end-to-end without live platform apps.
 """
+
 from __future__ import annotations
 
 import uuid

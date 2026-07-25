@@ -1,4 +1,5 @@
 """Shared FastAPI dependencies: JWT auth + per-user rate limiting."""
+
 from __future__ import annotations
 
 import os
@@ -57,6 +58,4 @@ def enforce_rate_limit(request: Request, user_id: str = Depends(get_current_user
     try:
         rate_limiter.check(key=user_id, tier=tier)
     except RateLimitExceeded as exc:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc

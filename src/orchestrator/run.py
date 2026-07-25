@@ -1,4 +1,5 @@
 """CLI entry point: run a single campaign cycle for a demo brand."""
+
 from __future__ import annotations
 
 from src.orchestrator.graph import run_campaign

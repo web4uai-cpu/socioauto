@@ -1,4 +1,5 @@
 """Moderation Agent: mandatory brand-safety/compliance gate before publish."""
+
 from __future__ import annotations
 
 import re
