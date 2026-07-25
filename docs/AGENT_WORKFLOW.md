@@ -17,9 +17,28 @@ NLP Parser extracts:
 Output: Structured CampaignRequest object
 ```
 
-Implemented today as `CampaignCreateRequest` in
-[src/api/schemas.py](../src/api/schemas.py), accepted by `POST /api/v1/campaigns`
-([src/api/routes/campaigns.py](../src/api/routes/campaigns.py)).
+**Implemented.** `CampaignCreateRequest` ([src/api/schemas.py](../src/api/schemas.py)) is the
+structured object, accepted by `POST /api/v1/campaigns` (synchronous) or `POST
+/api/v1/campaigns/start` (background, with progress polling) in
+[src/api/routes/campaigns.py](../src/api/routes/campaigns.py). The extraction itself is
+[src/agents/input_parser.py](../src/agents/input_parser.py), the first agent in the pipeline:
+it turns `raw_input` into `state.brief` and seeds the Research Agent with the parsed topic.
+
+| Field | Status |
+|---|---|
+| Topic | ✅ `brief["topic"]` |
+| Target audience | ✅ `brief["target_audience"]` |
+| Platforms — default `[instagram, twitter, linkedin]` | ✅ request default matches |
+| Tone — default `professional` | ✅ request default matches |
+| CTA — default `"Learn more"` | ⚠️ no default; `cta` stays `None` unless supplied. The SEO Agent supplies a `lead_cta` fallback downstream instead. |
+
+The parser also extracts `intent` (announce/educate/promote/engage/recruit/celebrate), `goal`,
+`key_points`, and `constraints`, which the spec above does not list. Platforms and tone come
+from request fields rather than being parsed out of the sentence.
+
+**Also selected at input:** `post_kind` — `text`, `image`, `video`, `audio`, or
+`faceless_video` — which gates the generation agents in Phase 3. Blank means "decide per
+platform". See [AGENTS.md](AGENTS.md#post-kinds).
 
 ### Phase 2: RESEARCH (2-5 minutes)
 
@@ -72,9 +91,27 @@ SEO Agent executes:
 Output: Complete ContentPackage
 ```
 
-Baseline today: [src/agents/content_creation.py](../src/agents/content_creation.py) drafts
-per-platform copy respecting `PLATFORM_LIMITS`. Visual Agent, Video Agent, and SEO Agent are
-not yet implemented — see Phase 3/5 of [IMPLEMENTATION_PLAN.md](../IMPLEMENTATION_PLAN.md).
+**Implemented, with two caveats.** All four agents exist, plus an Audio Agent the spec above
+omits. They run **sequentially**, not in parallel — see
+[src/orchestrator/graph.py](../src/orchestrator/graph.py).
+
+| Agent | File | State |
+|---|---|---|
+| Content | [content_creation.py](../src/agents/content_creation.py) | ✅ per-platform copy respecting `PLATFORM_LIMITS` |
+| Visual | [visual.py](../src/agents/visual.py) | ✅ brief always; **renders real images** when `IMAGE_PROVIDER`+`IMAGE_API_KEY` are set, else spec-only |
+| Video | [video.py](../src/agents/video.py) | ✅ hook + timed scenes + thumbnail prompt |
+| **Audio** | [audio.py](../src/agents/audio.py) | ✅ voiceover script, voice spec, transcript, duration — *not in the spec above* |
+| SEO | [seo.py](../src/agents/seo.py) | ✅ keywords, meta description, slug, lead CTA, per-platform hashtag caps |
+
+Which agents run is gated by `post_kind`: an `audio` post gets a voiceover and cover art but
+**no video script**; a `text` post gets none of them. Full matrix in
+[AGENTS.md](AGENTS.md#post-kinds).
+
+Caveats against the spec's numbers:
+- **Image sizes**: LinkedIn 1200x627 matches; Instagram uses 1080x1350 (4:5). X uses 1600x900
+  rather than 1200x675 — same 16:9 ratio, larger. `PLATFORM_VISUAL_SPEC` in `visual.py`.
+- **YouTube is not a supported platform**, so there is no 60-second YouTube script. TikTok is
+  30s as specified; Instagram 30s, Facebook/X 45s.
 
 ### Phase 4: REVIEW & APPROVAL (User-dependent)
 
@@ -110,11 +147,25 @@ Captures post IDs and URLs
 Output: PublishedPosts with tracking IDs
 ```
 
-Baseline today: [src/agents/scheduling.py](../src/agents/scheduling.py) assigns a naive fixed
-cadence slot; per-platform optimal-time tables above are not yet implemented. Publishing:
-[src/agents/publishing.py](../src/agents/publishing.py) +
-[src/platforms/http_client.py](../src/platforms/http_client.py) (retry/backoff), OAuth per
-platform is a Phase 4 TODO.
+**Scheduling implemented.** [src/scheduling/optimal_times.py](../src/scheduling/optimal_times.py)
+holds ranked preferred hours per platform and `next_optimal_slot()` finds the next one;
+[scheduling.py](../src/agents/scheduling.py) assigns slots with a 2-hour minimum gap per
+platform so a campaign does not burst-post. LinkedIn skips weekends.
+
+⚠️ The hours are stored in **UTC**, whereas the windows quoted above read as local time — so
+actual send times differ from the table unless your audience is UTC. Per-audience timezone
+resolution is not implemented.
+
+**Publishing implemented**: [publishing.py](../src/agents/publishing.py) +
+[http_client.py](../src/platforms/http_client.py) (tenacity retry/backoff, circuit breaker),
+and OAuth **is** wired — [src/platforms/oauth/](../src/platforms/oauth/) with
+`GET /api/v1/accounts/{platform}/authorize` and a callback route. Without a connected account
+the publisher runs in **simulate** mode and returns a synthetic `…-sim-…` id.
+
+> 🚨 **Scheduled posts do not currently publish in production.** The due-post runner is a
+> Celery beat task and no worker/beat service is deployed — see
+> [DEPLOYMENT.md §5](DEPLOYMENT.md). Approve-and-publish-now works; "schedule for later" does
+> not fire until that service exists.
 
 ### Phase 6: ANALYTICS & OPTIMIZATION (Ongoing)
 
@@ -199,18 +250,30 @@ See [REVENUE_MODEL.md](../REVENUE_MODEL.md) for pricing and unit economics.
 
 ## High-Level Flow
 
+As actually executed by [src/orchestrator/graph.py](../src/orchestrator/graph.py) — sequential,
+not parallel. Visual/video/audio/SEO sit **before** moderation so every generated asset is
+reviewed, not just the copy; audio runs after video so it can voice that script.
+
 ```mermaid
-flowchart LR
-    IN[User Input - Natural Language] --> RA[Research Agent]
-    RA --> CA[Content Agent]
+flowchart TD
+    IN[User Input - Natural Language] --> IP[Input Parser]
+    IP --> RA[Research Agent]
+    RA --> CS[Content Strategy]
+    CS --> CA[Content Agent]
     CA --> VA[Visual Agent]
-    CA --> VID[Video Agent]
-    CA --> SEO[SEO Agent]
-    VA --> RQ[Review Queue]
-    VID --> RQ
-    SEO --> RQ
-    RQ -->|Human Approval| PUB[Publishing Agent]
-    PUB --> PLATFORMS[Instagram / Twitter / LinkedIn / Facebook / TikTok / YouTube]
-    PLATFORMS --> ANL[Analytics Agent]
-    ANL --> FIN[Financial Agent]
+    VA --> VID[Video Agent]
+    VID --> AUD[Audio Agent]
+    AUD --> SEO[SEO Agent]
+    SEO --> MOD[Moderation Gate]
+    MOD -->|approved| RQ[Review Queue]
+    MOD -->|rejected| REV[Needs revision]
+    RQ -->|Human Approval| SCH[Scheduling Agent]
+    SCH --> PUB[Publishing Agent]
+    PUB --> PLATFORMS[Instagram / X / LinkedIn / Facebook / TikTok]
+    PLATFORMS --> ENG[Engagement Agent]
+    ENG --> ANL[Analytics Agent]
+    ANL --> FIN[Financial Agent - not implemented]
 ```
+
+`post_kind` decides whether the Visual, Video, and Audio nodes do any work for a given item;
+each no-ops cheaply when the kind does not need it.
