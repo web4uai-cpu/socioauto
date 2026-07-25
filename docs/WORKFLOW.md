@@ -131,6 +131,11 @@ Output: Complete ContentPackage
 
 **Content Generation Parallelism:**
 
+> **Aspirational.** The snippet below is the target design, not current behaviour:
+> `src/orchestrator/graph.py` runs agents sequentially in-process and LangGraph is not a
+> dependency. Visual/video/audio/SEO already no-op cheaply for items whose `PostKind` does
+> not need them, so the sequential pass is not the bottleneck it looks like here.
+
 ```python
 # LangGraph parallel execution
 async def generate_content_parallel(state: CampaignState):

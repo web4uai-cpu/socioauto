@@ -89,9 +89,12 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 ## 4b. Visual Agent
 - **File**: `src/agents/visual.py`
 - **Role**: Attaches an image/thumbnail generation spec to every calendar item.
-- **Scope**: writes the *spec*, not pixels — no image-generation provider is wired up yet.
-  A future provider consumes `visual["prompt"]` + `aspect_ratio` and appends the rendered file
-  to `item.media`; this agent's contract does not change when that lands.
+- **Scope**: always writes the brief. If `IMAGE_PROVIDER` + `IMAGE_API_KEY` are set (dashboard
+  → Integrations), it also **renders** the image via `src/media/image_provider.py`, stores it
+  through `MediaStorage`, appends it to `item.media`, and flips `visual["status"]` from
+  `"spec"` to `"generated"`. With no provider configured it stays spec-only.
+- **Failure is non-fatal**: a failing image API leaves the spec in place and the campaign
+  continues — an unavailable image service must never cost the user their copy.
 - **Platform logic**: native aspect ratio/size per platform (`PLATFORM_VISUAL_SPEC`) —
   Instagram 4:5, TikTok 9:16, X 16:9, LinkedIn/Facebook 1.91:1.
 - **Output schema**: `item.visual = {prompt, alt_text, overlay_text, style, aspect_ratio,

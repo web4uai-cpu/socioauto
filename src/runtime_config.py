@@ -55,6 +55,31 @@ SETTING_SPECS: tuple[SettingSpec, ...] = (
         is_secret=False,
         help_text="Defaults to the latest Claude model when blank.",
     ),
+    # --- Image generation ------------------------------------------------------------
+    SettingSpec(
+        "IMAGE_PROVIDER",
+        "Image provider",
+        "ai",
+        is_secret=False,
+        help_text=(
+            "Leave as 'none' and the Visual Agent writes image briefs without rendering "
+            "them. Set to 'openai' plus a key to generate real images."
+        ),
+        choices=("none", "openai"),
+    ),
+    SettingSpec(
+        "IMAGE_API_KEY",
+        "Image API key",
+        "ai",
+        help_text="Separate from the LLM key — Claude does not generate images.",
+    ),
+    SettingSpec(
+        "IMAGE_MODEL",
+        "Image model",
+        "ai",
+        is_secret=False,
+        help_text="Defaults to gpt-image-1 when blank.",
+    ),
     # --- Billing -------------------------------------------------------------------
     SettingSpec("STRIPE_SECRET_KEY", "Secret key", "billing"),
     SettingSpec(

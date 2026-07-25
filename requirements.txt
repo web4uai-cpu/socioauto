@@ -9,6 +9,8 @@ sqlalchemy>=2.0
 alembic>=1.13
 psycopg2-binary>=2.9
 anthropic>=0.116
+# Image generation only (Claude does not generate images). Unused until IMAGE_PROVIDER is set.
+openai>=1.40
 python-dotenv>=1.0
 tenacity>=8.3
 pyjwt>=2.9

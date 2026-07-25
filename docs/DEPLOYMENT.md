@@ -117,6 +117,18 @@ Stripe events consumed: `checkout.session.completed`, `customer.subscription.*`,
 
 ## 5. Worker + scheduler
 
+> **Not currently deployed.** The Railway project runs one service (`socioauto`, the API).
+> Until the worker and beat services below exist, two things silently do nothing:
+>
+> | Broken today | Consequence |
+> |---|---|
+> | `POST /api/v1/campaigns/async` | Returns `202 queued`; the task is never processed. |
+> | `scheduling.publish_due_posts` (beat) | **"Schedule for later" never publishes.** |
+>
+> Unaffected: `POST /api/v1/campaigns` (synchronous) and `POST /api/v1/campaigns/start`
+> (FastAPI background task, which is what the composer's progress bar uses). Both run
+> in the API process and need no worker.
+
 The API alone does not publish scheduled posts or draft engagement replies. Run both:
 
 ```bash
@@ -124,8 +136,41 @@ celery -A src.orchestrator.tasks.celery_app worker -Q orchestrator -l info
 celery -A src.orchestrator.tasks.celery_app beat -l info
 ```
 
-On Railway these are separate services sharing the same image and env vars. `beat` drives
-`scheduling.publish_due_posts` once a minute.
+### Deploying them on Railway
+
+Both share the API's image and environment. `Procfile` declares the process types; each
+Railway service overrides its start command. From the repo root:
+
+```bash
+# One-off: create the two services in the existing project.
+railway add --service socioauto-worker
+railway add --service socioauto-beat
+
+# Point each at the same repo, then set its start command in the Railway dashboard
+# (Settings → Deploy → Custom Start Command):
+#   socioauto-worker : celery -A src.orchestrator.tasks.celery_app worker -Q orchestrator -l info
+#   socioauto-beat   : celery -A src.orchestrator.tasks.celery_app beat -l info
+
+# Both need the same variables as the API — at minimum:
+railway variables --service socioauto-worker \
+  --set "APP_ENV=production" \
+  --set "DATABASE_URL=${DATABASE_URL}" \
+  --set "REDIS_URL=${REDIS_URL}" \
+  --set "JWT_SECRET_KEY=${JWT_SECRET_KEY}" \
+  --set "APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}"
+# …repeat for socioauto-beat.
+```
+
+Run exactly one `beat` instance — two schedulers double-publish every due post.
+
+Verify after deploy:
+
+```bash
+railway logs --service socioauto-worker   # expect "celery@… ready."
+railway logs --service socioauto-beat     # expect "Scheduler: Sending due task"
+```
+
+Then schedule a post a few minutes out in the UI and confirm it flips to `published`.
 
 ## 6. Frontend
 

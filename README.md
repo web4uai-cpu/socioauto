@@ -25,7 +25,9 @@ scaling strategy, and [docs/AGENTS.md](docs/AGENTS.md) for each agent's prompt/s
 ## Tech Stack
 
 - **Runtime**: Python 3.11+ (FastAPI backend), TypeScript/React dashboard (optional)
-- **Orchestration**: LangGraph-style agent graph (`src/orchestrator`)
+- **Orchestration**: in-process sequential agent pipeline (`src/orchestrator/graph.py`).
+  LangGraph is the intended target runtime but is **not** a dependency today — see
+  [ARCHITECTURE.md](ARCHITECTURE.md) for the current-vs-target table.
 - **Queue/Scheduling**: Redis + Celery (or APScheduler for local dev)
 - **Storage**: PostgreSQL (metadata), S3-compatible bucket (media assets)
 - **LLM**: Pluggable provider interface (`src/llm/provider.py`) — Anthropic (Claude), with a

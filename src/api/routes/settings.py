@@ -19,6 +19,7 @@ from src.db.repositories.settings import all_settings, set_setting, stored_keys
 from src.db.session import get_db
 from src.llm.provider import reset_provider
 from src.logging_config import get_logger
+from src.media.image_provider import reset_image_provider
 from src.runtime_config import SETTING_SPECS, SPECS_BY_KEY, invalidate_cache
 
 logger = get_logger(__name__)
@@ -123,9 +124,10 @@ def update_settings(
             )
         set_setting(db, key, value, is_secret=spec.is_secret, actor=admin)
 
-    # New keys must take effect immediately, and the LLM client caches its credentials.
+    # New keys must take effect immediately, and both provider clients cache credentials.
     invalidate_cache()
     reset_provider()
+    reset_image_provider()
 
     audit_repo.record(
         db,
@@ -152,6 +154,7 @@ def integration_status(
 
     return {
         "ai": ready("LLM_API_KEY"),
+        "images": ready("IMAGE_API_KEY"),
         "billing": ready("STRIPE_SECRET_KEY") and ready("STRIPE_WEBHOOK_SECRET"),
         "x": ready("X_CLIENT_ID") and ready("X_CLIENT_SECRET"),
         "meta": ready("META_APP_ID") and ready("META_APP_SECRET"),
