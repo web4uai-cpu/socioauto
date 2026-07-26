@@ -93,10 +93,20 @@ the source of truth for schema changes.
 
 ## 3. Everything else via the dashboard
 
-Sign in as an `ADMIN_EMAILS` account and open **Integrations** to set:
+Sign in as an `ADMIN_EMAILS` account.
 
-- **AI provider** — `LLM_PROVIDER=anthropic` + `LLM_API_KEY`. Until this is set the agents
-  emit deterministic placeholder copy rather than generated content.
+Open **AI Provider** to set, per vendor, one API key (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`GOOGLE_API_KEY`, …), then point each workload slot — analysis, research, writing, voice,
+video, image — at the model best suited to it. A slot with no provider or no key emits
+deterministic placeholder copy rather than generated content, and never fails the campaign.
+The older `LLM_PROVIDER`/`LLM_API_KEY`/`LLM_MODEL` values still work as a fallback for every
+text slot, so an existing deployment needs no change at upgrade time.
+
+Voice and video slots are saved and handed to the agents but do **not** generate yet — those
+agents still emit specs. The board labels them "Not yet connected".
+
+Then open **Integrations** to set:
+
 - **Billing** — Stripe secret key, webhook signing secret, and the four price IDs.
 - **Social platforms** — OAuth client IDs/secrets and webhook secrets for X, Meta,
   LinkedIn, TikTok, YouTube.
