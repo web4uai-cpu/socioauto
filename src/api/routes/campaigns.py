@@ -36,6 +36,7 @@ from src.orchestrator.graph import (
     run_to_moderation,
 )
 from src.orchestrator.state import CampaignState, ContentItem, ContentStatus, resolve_kind
+from src.scheduling.runner import items_needing_attention
 
 logger = get_logger(__name__)
 
@@ -386,6 +387,26 @@ def list_campaigns(
 ) -> list[CampaignResponse]:
     """List only campaigns created by the authenticated user."""
     return [_to_response(record) for record in campaigns_repo.for_user(db, current_user.id)]
+
+
+@router.get("/needs-attention")
+def campaigns_needing_attention(
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+) -> list[dict]:
+    """Posts whose automated recovery is exhausted and that an operator must now handle.
+
+    This is the "escalate to human" arm of the recovery policy: without a surface like this, a
+    post that fails every retry just stops existing quietly.
+
+    Declared **before** `/{campaign_id}` — FastAPI matches in definition order, so a dynamic
+    route above this one would swallow "needs-attention" as a campaign id.
+    """
+    escalated: list[dict] = []
+    for rec in campaigns_repo.for_user(db, current_user.id):
+        items = items_needing_attention(rec.state)
+        if items:
+            escalated.append({"campaign_id": rec.id, "prompt": rec.prompt, "items": items})
+    return escalated
 
 
 @router.get("/{campaign_id}", response_model=CampaignResponse)

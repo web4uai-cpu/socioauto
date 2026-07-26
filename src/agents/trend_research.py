@@ -13,7 +13,10 @@ from typing import Any
 
 from src.agents.base import BaseAgent
 from src.llm.provider import get_provider
+from src.logging_config import get_logger
 from src.orchestrator.state import CampaignState
+
+logger = get_logger(__name__)
 
 MAX_TRENDS = 10
 TARGET_KEYWORDS = 20
@@ -159,7 +162,22 @@ class TrendResearchAgent(BaseAgent):
         return state
 
     def _research_with_llm(self, state: CampaignState) -> dict[str, Any] | None:
+        """Research the brief, retrying once with broader terms before giving up.
+
+        A narrow niche is the usual reason a research call comes back empty, so the retry
+        drops the niche qualifier and widens the ask rather than repeating the same query.
+        """
+        result = self._attempt(state, broaden=False)
+        if result:
+            return result
+        logger.info("research returned nothing; retrying with broader terms")
+        return self._attempt(state, broaden=True)
+
+    def _attempt(self, state: CampaignState, *, broaden: bool) -> dict[str, Any] | None:
         niche = state.voice_guidelines.get("niche") or state.brand_name
+        if broaden:
+            # Widen to the parent category and drop platform/audience constraints.
+            niche = f"the broader category around {niche}"
         audience = state.brief.get("target_audience") or state.voice_guidelines.get(
             "audience", "the brand's audience"
         )

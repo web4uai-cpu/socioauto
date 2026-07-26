@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from src.logging_config import get_logger
 from src.orchestrator.state import CampaignState, ContentStatus
-from src.platforms.http_client import PlatformHttpError, publish_post
+from src.platforms.delivery import deliver, is_due
 
 logger = get_logger(__name__)
 
@@ -14,7 +14,10 @@ logger = get_logger(__name__)
 def publish_due_items(
     state: CampaignState, access_tokens: dict[str, str], now: datetime | None = None
 ) -> int:
-    """Publish every SCHEDULED item whose ``scheduled_at`` is at or before ``now``.
+    """Publish every SCHEDULED item that is due, including ones awaiting a retry.
+
+    Delivery, retry scheduling, and escalation all live in `platforms.delivery`, shared with
+    the Publishing Agent — this runner only decides *which* items are due.
 
     Uses the connected account's token per platform (falls back to simulate mode when absent).
     Mutates ``state`` in place and returns the number of items published.
@@ -22,22 +25,23 @@ def publish_due_items(
     now = now or datetime.now(UTC)
     published = 0
     for item in state.calendar:
-        if item.status != ContentStatus.SCHEDULED:
+        if item.status != ContentStatus.SCHEDULED or not is_due(item, now):
             continue
-        if item.scheduled_at is not None and item.scheduled_at > now:
-            continue  # not due yet
-        try:
-            token = access_tokens.get(item.platform)
-            item.external_post_id = publish_post(item.platform, item.body, access_token=token)
-            item.published_at = datetime.now(UTC)
-            item.status = ContentStatus.PUBLISHED
+        if deliver(item, access_tokens.get(item.platform), now):
             published += 1
-            logger.info(
-                "due post published",
-                extra={"platform": item.platform, "external_post_id": item.external_post_id},
-            )
-        except PlatformHttpError as exc:
-            item.status = ContentStatus.FAILED
-            state.note(f"[scheduler] publish failed for {item.platform}: {exc}")
-            logger.error("due publish failed", extra={"platform": item.platform, "error": str(exc)})
     return published
+
+
+def items_needing_attention(state: CampaignState) -> list[dict]:
+    """Items whose automated recovery is exhausted and that a human must now look at."""
+    return [
+        {
+            "platform": item.platform,
+            "topic": item.topic,
+            "status": item.status.value,
+            "attempts": item.retry_count,
+            "last_error": item.last_error,
+        }
+        for item in state.calendar
+        if item.needs_human
+    ]

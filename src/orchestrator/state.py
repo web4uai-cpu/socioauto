@@ -106,6 +106,13 @@ class ContentItem:
     # Latest performance snapshot pulled from the platform: impressions/likes/shares/comments,
     # plus clicks where the platform reports them. Empty until a post is live and measured.
     metrics: dict[str, Any] = field(default_factory=dict)
+    # Delivery retry bookkeeping. A publish failure schedules a later attempt rather than
+    # killing the post; after MAX_PUBLISH_ATTEMPTS it is escalated to a human instead.
+    retry_count: int = 0
+    next_retry_at: datetime | None = None
+    last_error: str | None = None
+    # Set when automated recovery has been exhausted and an operator needs to look.
+    needs_human: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -130,6 +137,10 @@ class ContentItem:
             "external_post_id": self.external_post_id,
             "external_post_url": self.external_post_url,
             "metrics": dict(self.metrics),
+            "retry_count": self.retry_count,
+            "next_retry_at": _iso(self.next_retry_at),
+            "last_error": self.last_error,
+            "needs_human": self.needs_human,
         }
 
     @classmethod
@@ -156,6 +167,10 @@ class ContentItem:
             external_post_id=data.get("external_post_id"),
             external_post_url=data.get("external_post_url"),
             metrics=dict(data.get("metrics", {})),
+            retry_count=int(data.get("retry_count", 0)),
+            next_retry_at=_parse_dt(data.get("next_retry_at")),
+            last_error=data.get("last_error"),
+            needs_human=bool(data.get("needs_human", False)),
         )
 
 

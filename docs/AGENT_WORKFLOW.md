@@ -377,11 +377,30 @@ they are contract-priced and assuming a number would fabricate revenue.
 
 | Error Type | Recovery Strategy | Current implementation |
 |---|---|---|
-| Research Error | Retry with broader search terms | not yet implemented |
-| Content Generation Error | Fallback to template-based generation | `ContentCreationAgent` uses a simple template today (no LLM fallback logic yet) |
-| Publishing Error | Add to retry queue (exponential backoff) | `publish_post` retries via `tenacity` (3 attempts, exponential jitter); `PublishingAgent` catches `PlatformHttpError` and marks the item `FAILED` |
-| API Rate Limit | Exponential backoff, queue for later | `src/security/rate_limit.py` rejects with 429 (per-user, per-tier); backoff-and-requeue on inbound 429 from platforms is a TODO in `publish_post` |
-| Unknown Error | Escalate to human operator | `PublishingAgent`/`http_client.py` convert unexpected exceptions to `PlatformHttpError` and log via `src/logging_config.py`; no human escalation queue yet |
+| Research Error | Retry with broader search terms | ✅ `TrendResearchAgent` retries once with the niche widened to its parent category before falling back to topic extraction |
+| Content Generation Error | Fallback to template-based generation | ✅ every LLM-backed agent has a deterministic fallback, so the pipeline completes with no provider configured |
+| Publishing Error | Add to retry queue (exponential backoff) | ✅ two layers — see below |
+| API Rate Limit | Exponential backoff, queue for later | ✅ 429 is retried in-request by `tenacity`, then re-queued by the attempt-level policy. Inbound limits: `src/security/rate_limit.py` |
+| Unknown Error | Escalate to human operator | ✅ unexpected exceptions become `PlatformHttpError`; after `MAX_PUBLISH_ATTEMPTS` the item is flagged `needs_human` and listed by `GET /api/v1/campaigns/needs-attention` |
+
+### Two layers of publish retry
+
+[src/platforms/delivery.py](../src/platforms/delivery.py) owns the delivery path:
+
+1. **Transport level** — `request_json` retries 429/5xx/network errors via `tenacity`
+   (3 attempts, exponential jitter) *within* one publish attempt.
+2. **Attempt level** — a failed publish keeps the item `SCHEDULED` and sets `next_retry_at`
+   with escalating backoff (5m → 15m → 45m → 2h → 6h), so the due-post runner retries it later.
+   A post is not destroyed by one bad minute. Steps are deliberately minutes-to-hours: outages
+   and rate-limit windows rarely clear in seconds, and hammering them makes it worse.
+
+After `MAX_PUBLISH_ATTEMPTS` the item becomes `FAILED` **and** `needs_human`, which is what puts
+it on the escalation queue. A successful retry clears `next_retry_at`, `last_error`, and
+`needs_human`.
+
+> `deliver()` is shared by the Publishing Agent **and** the due-post runner. They previously had
+> separate copies of this logic and had already drifted — the runner never recorded
+> `external_post_url`. A test asserts both paths produce identical results.
 
 ## 📊 Platform Feature Matrix
 
