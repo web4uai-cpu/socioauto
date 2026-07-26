@@ -87,7 +87,7 @@ class InputParserAgent(BaseAgent):
             f"Request: {raw}\n\n"
             "Extract the campaign brief. Use the most specific intent that fits."
         )
-        result = get_provider().complete_json(prompt, BRIEF_SCHEMA, system=SYSTEM)
+        result = get_provider("writing").complete_json(prompt, BRIEF_SCHEMA, system=SYSTEM)
         if not result or not result.get("topic"):
             return None
         result.setdefault("intent", "announce")

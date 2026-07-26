@@ -6,13 +6,17 @@ import { Field, Input, Select } from "./ui/Input";
 import { PlugIcon } from "./ui/Icon";
 
 /** One dashboard-editable setting, as described by GET /admin/settings. */
-interface Setting {
+export interface Setting {
   key: string;
   label: string;
   group: string;
   is_secret: boolean;
   help_text: string;
   choices: string[];
+  /** True when a value outside `choices` is accepted (model fields). */
+  allow_custom: boolean;
+  /** Recommended value this field falls back to while unset. */
+  default: string;
   source: "database" | "environment" | "unset";
   configured: boolean;
   /** Plain value for non-secrets; a masked preview for secrets. */
@@ -20,22 +24,27 @@ interface Setting {
 }
 
 const GROUP_LABELS: Record<string, string> = {
-  ai: "AI provider",
   billing: "Billing (Stripe)",
   platforms: "Social platforms",
   general: "URLs",
+  ai_costs: "AI token costs",
+  ai_legacy: "Legacy AI settings",
 };
 
 const GROUP_ACCENTS: Record<string, string> = {
-  ai: "from-brand-400 to-brand-600",
   billing: "from-series-3 to-emerald-700",
   platforms: "from-series-2 to-orange-600",
   general: "from-violet-400 to-violet-600",
+  ai_costs: "from-brand-400 to-brand-600",
+  ai_legacy: "from-slate-300 to-slate-500",
 };
 
-const GROUP_ORDER = ["ai", "billing", "platforms", "general"];
+// The provider keys and per-job model slots live on the AI Provider board instead, so those
+// groups are deliberately absent here. What remains is cost rates plus the superseded
+// single-provider settings, kept visible so an operator can see and clear them.
+const GROUP_ORDER = ["billing", "platforms", "general", "ai_costs", "ai_legacy"];
 
-function SourceBadge({ setting }: { setting: Setting }) {
+export function SourceBadge({ setting }: { setting: Setting }) {
   const styles: Record<Setting["source"], string> = {
     database: "bg-emerald-50 text-emerald-700 ring-emerald-200",
     environment: "bg-brand-50 text-brand-700 ring-brand-200",

@@ -2,13 +2,16 @@
 
 Only runs for platforms where video is a native format. Like the Visual Agent it produces a
 script and a thumbnail *spec* rather than rendering a file; a future render step consumes
-`item.video["script"]` and `thumbnail_prompt` and appends the output to `item.media`.
+`item.video["script"]` and `thumbnail_prompt` and appends the output to `item.media`. The video
+provider/model chosen in the dashboard's video slot is stamped onto the script
+(`video_provider`, `video_model`) so that step already carries the admin's choice.
 """
 
 from __future__ import annotations
 
 from src.agents.base import BaseAgent
 from src.llm.provider import get_provider
+from src.llm.resolve import resolve_role
 from src.orchestrator.state import VIDEO_KINDS, CampaignState, ContentItem, PostKind
 
 # Target runtime in seconds per platform's native short-form surface.
@@ -70,7 +73,10 @@ class VideoAgent(BaseAgent):
         Returns:
             The same state with video scripts attached where applicable.
         """
-        provider = get_provider()
+        provider = get_provider("writing")
+        # The video slot the admin picked. No footage is rendered yet, but recording the
+        # choice on the script means the future render step already carries it.
+        video_slot = resolve_role("video")
         scripted = 0
         for item in state.calendar:
             # Kind decides this, not platform: the user asked for a video, so honour it even
@@ -85,6 +91,8 @@ class VideoAgent(BaseAgent):
             script["target_seconds"] = target
             script["faceless"] = faceless
             script["status"] = "script"  # becomes "rendered" once a video pipeline runs it
+            script["video_provider"] = video_slot.provider
+            script["video_model"] = video_slot.model
             item.video = script
             scripted += 1
         state.note(f"[{self.name}] scripted {scripted} video items")

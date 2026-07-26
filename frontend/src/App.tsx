@@ -8,6 +8,7 @@ import { ContentPage } from "./pages/admin/ContentPage";
 import { UsersPage } from "./pages/admin/UsersPage";
 import { BillingPage } from "./pages/admin/BillingPage";
 import { IntegrationsPage } from "./pages/admin/IntegrationsPage";
+import { AiProviderPage } from "./pages/admin/AiProviderPage";
 import { AppLayout } from "./pages/app/AppLayout";
 import { ComposePage } from "./pages/app/ComposePage";
 import { PostsPage } from "./pages/app/PostsPage";
@@ -64,6 +65,7 @@ export function App() {
           <Route path="content" element={<ContentPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="billing" element={<BillingPage />} />
+          <Route path="ai" element={<AiProviderPage />} />
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route index element={<Navigate to="analytics" replace />} />
         </Route>

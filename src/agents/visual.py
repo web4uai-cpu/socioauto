@@ -73,7 +73,7 @@ class VisualAgent(BaseAgent):
         Returns:
             The same state with visual specs attached.
         """
-        provider = get_provider()
+        provider = get_provider("writing")
         images = get_image_provider()
         specced = 0
         rendered = 0

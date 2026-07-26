@@ -130,7 +130,7 @@ class SEOAgent(BaseAgent):
         Returns:
             The same state with SEO metadata attached.
         """
-        provider = get_provider()
+        provider = get_provider("analysis")
         optimized = 0
         for item in state.calendar:
             if item.seo:

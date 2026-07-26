@@ -12,7 +12,7 @@ usage rather than sharing a global counter.
 from __future__ import annotations
 
 from contextvars import ContextVar
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from src.runtime_config import get_setting
 
@@ -21,16 +21,23 @@ TOKENS_PER_MILLION = 1_000_000
 
 @dataclass
 class Usage:
-    """Token counts for one unit of work."""
+    """Token counts for one unit of work, with a per-model breakdown.
+
+    The breakdown matters now that different agents can run on different vendors: a single
+    contracted rate can only price a run that used one model.
+    """
 
     input_tokens: int = 0
     output_tokens: int = 0
     calls: int = 0
+    by_model: dict[str, int] = field(default_factory=dict)
 
-    def add(self, *, input_tokens: int, output_tokens: int) -> None:
+    def add(self, *, input_tokens: int, output_tokens: int, model: str = "") -> None:
         self.input_tokens += input_tokens
         self.output_tokens += output_tokens
         self.calls += 1
+        if model:
+            self.by_model[model] = self.by_model.get(model, 0) + input_tokens + output_tokens
 
     @property
     def total_tokens(self) -> int:
@@ -47,11 +54,11 @@ def start() -> Usage:
     return usage
 
 
-def record(input_tokens: int, output_tokens: int) -> None:
+def record(input_tokens: int, output_tokens: int, model: str = "") -> None:
     """Add one call's tokens to the active scope. A no-op outside any scope."""
     usage = _current.get()
     if usage is not None:
-        usage.add(input_tokens=input_tokens, output_tokens=output_tokens)
+        usage.add(input_tokens=input_tokens, output_tokens=output_tokens, model=model)
 
 
 def _rate(key: str) -> float | None:
@@ -66,10 +73,16 @@ def _rate(key: str) -> float | None:
 
 
 def estimate_cost(usage: Usage) -> float | None:
-    """Dollar cost for `usage`, or None when rates are not configured.
+    """Dollar cost for `usage`, or None when it cannot be stated exactly.
 
     Returning None rather than 0.0 matters: zero would read as "this was free".
+
+    The configured rates describe one model. Once a run has spanned more than one model —
+    possible now that each agent has its own provider slot — a single pair of rates cannot
+    price it, so we report exact token counts and no dollar figure rather than a wrong one.
     """
+    if len(usage.by_model) > 1:
+        return None
     input_rate = _rate("LLM_COST_PER_MTOK_INPUT")
     output_rate = _rate("LLM_COST_PER_MTOK_OUTPUT")
     if input_rate is None and output_rate is None:
@@ -102,6 +115,18 @@ def merge(previous: dict[str, object], current: dict[str, object]) -> dict[str, 
     merged: dict[str, object] = {
         key: int(previous.get(key, 0) or 0) + int(current.get(key, 0) or 0) for key in _COUNTERS
     }
+    by_model: dict[str, int] = {}
+    for side in (previous, current):
+        for model, tokens in (side.get("by_model") or {}).items():  # type: ignore[union-attr]
+            by_model[model] = by_model.get(model, 0) + int(tokens or 0)
+    merged["by_model"] = by_model
+
+    if len(by_model) > 1:
+        # Same rule as `estimate_cost`: a run spanning several models cannot be priced from
+        # one pair of rates, so report tokens only rather than a figure we cannot stand behind.
+        merged["estimated_cost_usd"] = None
+        return merged
+
     costs = [
         side.get("estimated_cost_usd")
         for side in (previous, current)

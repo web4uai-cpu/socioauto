@@ -35,7 +35,18 @@ def _clean_settings():
     invalidate_cache()
     yield
     with SessionLocal() as db:
-        for key in ("LLM_API_KEY", "LLM_PROVIDER", "LLM_MODEL", "STRIPE_SECRET_KEY"):
+        for key in (
+            "LLM_API_KEY",
+            "LLM_PROVIDER",
+            "LLM_MODEL",
+            "STRIPE_SECRET_KEY",
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "AI_ANALYSIS_PROVIDER",
+            "AI_ANALYSIS_MODEL",
+            "AI_RESEARCH_PROVIDER",
+            "AI_RESEARCH_MODEL",
+        ):
             set_setting(db, key, "", is_secret=True, actor="test-cleanup")
     invalidate_cache()
 
@@ -137,9 +148,22 @@ def test_value_outside_allowed_choices_is_rejected():
     response = client.put(
         "/api/v1/admin/settings",
         headers=_headers(),
-        json={"values": {"LLM_PROVIDER": "openai"}},
+        json={"values": {"AI_ANALYSIS_PROVIDER": "not-a-vendor"}},
     )
     assert response.status_code == 400
+
+
+def test_model_field_accepts_a_model_id_outside_the_curated_list():
+    # A model released after this build must be usable without waiting for a deploy.
+    response = client.put(
+        "/api/v1/admin/settings",
+        headers=_headers(),
+        json={"values": {"AI_ANALYSIS_MODEL": "some-model-shipped-tomorrow"}},
+    )
+    assert response.status_code == 200
+    view = _find(response.json(), "AI_ANALYSIS_MODEL")
+    assert view["allow_custom"] is True
+    assert view["value"] == "some-model-shipped-tomorrow"
 
 
 def test_secret_is_encrypted_at_rest():
@@ -165,3 +189,49 @@ def test_status_endpoint_reports_readiness():
     response = client.get("/api/v1/admin/settings/status", headers=_headers())
     assert response.status_code == 200
     assert response.json()["ai"] is True
+
+
+def test_status_reports_each_ai_slot_separately():
+    """One configured slot must not imply the others are usable."""
+    client.put(
+        "/api/v1/admin/settings",
+        headers=_headers(),
+        json={
+            "values": {
+                "ANTHROPIC_API_KEY": "sk-ant-configured",
+                "AI_RESEARCH_PROVIDER": "anthropic",
+                # Analysis points at a vendor with no key, so it must read as not ready.
+                "AI_ANALYSIS_PROVIDER": "openai",
+            }
+        },
+    )
+    body = client.get("/api/v1/admin/settings/status", headers=_headers()).json()
+    assert body["ai_research"] is True
+    assert body["ai_analysis"] is False
+
+
+def test_ai_catalog_describes_slots_and_key_readiness():
+    response = client.get("/api/v1/admin/settings/ai-catalog", headers=_headers())
+    assert response.status_code == 200
+    roles = {role["role"]: role for role in response.json()["roles"]}
+    assert {"analysis", "research", "writing", "voice", "video", "image"} <= set(roles)
+
+    analysis = roles["analysis"]
+    assert analysis["provider_setting"] == "AI_ANALYSIS_PROVIDER"
+    providers = {p["id"]: p for p in analysis["providers"]}
+    assert "anthropic" in providers
+    assert providers["anthropic"]["key_setting"] == "ANTHROPIC_API_KEY"
+    assert providers["anthropic"]["key_configured"] is False
+    assert any(m["recommended"] for m in providers["anthropic"]["models"])
+
+    # Voice and video are configurable but not yet generating — the UI must be able to say so.
+    assert roles["voice"]["connected"] is False
+    assert roles["video"]["connected"] is False
+
+
+def test_ai_catalog_requires_admin():
+    assert client.get("/api/v1/admin/settings/ai-catalog").status_code == 401
+    forbidden = client.get(
+        "/api/v1/admin/settings/ai-catalog", headers=_headers("outsider@brand.com")
+    )
+    assert forbidden.status_code == 403

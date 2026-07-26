@@ -45,7 +45,7 @@ class EngagementAgent(BaseAgent):
             f"Inbound message: {message}\n\n"
             f"Write a single reply of at most {MAX_REPLY_CHARS} characters."
         )
-        draft = get_provider().complete(prompt, system=SYSTEM, max_tokens=2048)
+        draft = get_provider("writing").complete(prompt, system=SYSTEM, max_tokens=2048)
         return (draft[:MAX_REPLY_CHARS] if draft else None), False
 
     def run(self, state: CampaignState) -> CampaignState:

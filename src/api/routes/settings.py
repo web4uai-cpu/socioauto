@@ -17,7 +17,15 @@ from src.api.deps import enforce_rate_limit, require_admin
 from src.db.repositories import audit as audit_repo
 from src.db.repositories.settings import all_settings, set_setting, stored_keys
 from src.db.session import get_db
+from src.llm.catalog import (
+    PROVIDER_LABELS,
+    ROLE_SPECS,
+    key_setting_for,
+    model_setting_key,
+    provider_setting_key,
+)
 from src.llm.provider import reset_provider
+from src.llm.resolve import resolve_role
 from src.logging_config import get_logger
 from src.media.image_provider import reset_image_provider
 from src.runtime_config import SETTING_SPECS, SPECS_BY_KEY, invalidate_cache
@@ -38,6 +46,11 @@ class SettingView(BaseModel):
     is_secret: bool
     help_text: str
     choices: list[str]
+    # True when a value outside `choices` is accepted — model fields, so a newly released
+    # model id can be entered without waiting on a release.
+    allow_custom: bool
+    # Recommended value this field falls back to while unset.
+    default: str
     # Where the effective value comes from, so an operator can tell whether the dashboard
     # or the deployment environment is currently winning.
     source: str  # "database" | "environment" | "unset"
@@ -78,6 +91,8 @@ def _build_views(db: Session) -> list[SettingView]:
                 is_secret=spec.is_secret,
                 help_text=spec.help_text,
                 choices=list(spec.choices),
+                allow_custom=spec.allow_custom,
+                default=spec.default,
                 source=source,
                 configured=bool(effective),
                 value=_mask(effective)
@@ -117,7 +132,7 @@ def update_settings(
     for key, raw in payload.values.items():
         spec = SPECS_BY_KEY[key]
         value = raw.strip()
-        if spec.choices and value and value not in spec.choices:
+        if spec.choices and not spec.allow_custom and value and value not in spec.choices:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"{key} must be one of: {', '.join(spec.choices)}",
@@ -142,19 +157,74 @@ def update_settings(
     return _build_views(db)
 
 
+@router.get("/ai-catalog")
+def ai_catalog(_: str = Depends(require_admin), db: Session = Depends(get_db)) -> dict[str, object]:
+    """Describe every AI workload slot: which providers serve it, and with which models.
+
+    The dashboard uses this to filter each slot's model dropdown to the chosen provider and
+    to mark the recommended default, so an operator picks "the best research model" without
+    needing to know current model ids.
+    """
+    overrides = all_settings(db)
+
+    def key_configured(provider: str) -> bool:
+        key = key_setting_for(provider)
+        return bool(key) and bool(overrides.get(key) or os.environ.get(key, "").strip())
+
+    roles = []
+    for spec in ROLE_SPECS:
+        roles.append(
+            {
+                "role": spec.role,
+                "label": spec.label,
+                "help_text": spec.help_text,
+                "connected": spec.connected,
+                "default_provider": spec.default_provider,
+                "provider_setting": provider_setting_key(spec.role),
+                "model_setting": model_setting_key(spec.role),
+                "providers": [
+                    {
+                        "id": provider,
+                        "label": PROVIDER_LABELS.get(provider, provider),
+                        "key_setting": key_setting_for(provider),
+                        "key_configured": key_configured(provider),
+                        "models": [
+                            {
+                                "id": option.id,
+                                "label": option.label,
+                                "recommended": option.recommended,
+                            }
+                            for option in models
+                        ],
+                    }
+                    for provider, models in sorted(spec.providers.items())
+                ],
+            }
+        )
+    return {"roles": roles}
+
+
 @router.get("/status")
 def integration_status(
     _: str = Depends(require_admin), db: Session = Depends(get_db)
 ) -> dict[str, bool]:
-    """Quick per-integration readiness flags for dashboard badges."""
+    """Quick per-integration readiness flags for dashboard badges.
+
+    Each AI slot reports separately (`ai_analysis`, `ai_research`, …) because they can now
+    point at different vendors — one configured slot no longer means the rest are usable.
+    """
     overrides = all_settings(db)
 
     def ready(key: str) -> bool:
         return bool(overrides.get(key) or os.environ.get(key, "").strip())
 
+    ai_flags = {f"ai_{spec.role}": bool(resolve_role(spec.role).enabled) for spec in ROLE_SPECS}
+
     return {
-        "ai": ready("LLM_API_KEY"),
-        "images": ready("IMAGE_API_KEY"),
+        **ai_flags,
+        # Retained so existing dashboard badges keep working: true when any text slot is live.
+        "ai": any(ai_flags[f"ai_{role}"] for role in ("analysis", "research", "writing")),
+        "images": ai_flags["ai_image"],
         "billing": ready("STRIPE_SECRET_KEY") and ready("STRIPE_WEBHOOK_SECRET"),
         "x": ready("X_CLIENT_ID") and ready("X_CLIENT_SECRET"),
         "meta": ready("META_APP_ID") and ready("META_APP_SECRET"),

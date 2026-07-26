@@ -30,8 +30,10 @@ scaling strategy, and [docs/AGENTS.md](docs/AGENTS.md) for each agent's prompt/s
   [ARCHITECTURE.md](ARCHITECTURE.md) for the current-vs-target table.
 - **Queue/Scheduling**: Redis + Celery (or APScheduler for local dev)
 - **Storage**: PostgreSQL (metadata), S3-compatible bucket (media assets)
-- **LLM**: Pluggable provider interface (`src/llm/provider.py`) — Anthropic (Claude), with a
-  deterministic no-LLM fallback so the pipeline runs without credentials
+- **LLM**: Pluggable, multi-provider and **per-job** (`src/llm/provider.py`) — Anthropic,
+  OpenAI, and Google, chosen separately for analysis, research, writing, voice, video, and
+  image work under Admin → AI Provider, with a deterministic no-LLM fallback so the pipeline
+  runs without credentials
 - **Platform APIs**: X API v2, Meta Graph API, LinkedIn API, TikTok Content API,
   YouTube Data API v3
 - **Billing**: Stripe Checkout + signature-verified webhook sync (`src/billing/`)
@@ -77,8 +79,9 @@ pip install -r requirements.txt
 # 2. Configure environment
 copy config\settings.example.env .env
 # Only DATABASE_URL, REDIS_URL, JWT_SECRET_KEY and APP_ENCRYPTION_KEY are required here —
-# LLM, Stripe, and platform keys can instead be entered in the dashboard's Integrations
-# panel once the API is running. Without an LLM key the agents produce placeholder copy.
+# AI keys and model choices can instead be entered in the dashboard's AI Provider board, and
+# Stripe/platform keys in its Integrations panel, once the API is running. Without an AI key
+# the agents produce placeholder copy.
 
 # 3. Run the API
 uvicorn src.api.main:app --reload
@@ -158,6 +161,11 @@ npm run dev
 ```
 
 See [frontend/src/pages/AdminDashboard.tsx](frontend/src/pages/AdminDashboard.tsx).
+
+**Admin → AI Provider** ([AiProviderBoard.tsx](frontend/src/components/AiProviderBoard.tsx))
+is where each vendor key is entered once and each workload — analysis, research, writing,
+voice, video, image — is pointed at the model that is best at it. See
+[docs/AGENTS.md](docs/AGENTS.md#model-slots) for which agent runs on which slot.
 
 ## Testing
 

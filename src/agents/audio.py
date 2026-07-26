@@ -5,14 +5,17 @@ narration the Video Agent already wrote, so the voiceover matches the script rat
 drifting from it; for an audio-only post it derives a standalone script from the copy.
 
 Like the Visual and Video agents this produces a *spec*, not a sound file — no TTS provider is
-wired up yet. When one is added it consumes `audio["script"]` plus `audio["voice"]` and appends
-the rendered file to `item.media`, leaving this agent's contract unchanged.
+wired up yet. The voice provider/model chosen in the dashboard's voice slot is stamped onto the
+spec (`voice_provider`, `voice_model`) so the choice is already carried when a TTS step lands;
+that step consumes `audio["script"]` plus `audio["voice"]` and appends the rendered file to
+`item.media`, leaving this agent's contract unchanged.
 """
 
 from __future__ import annotations
 
 from src.agents.base import BaseAgent
 from src.llm.provider import get_provider
+from src.llm.resolve import resolve_role
 from src.orchestrator.state import AUDIO_KINDS, CampaignState, ContentItem, PostKind
 
 # Average narration pace. Used to estimate runtime from the script's word count.
@@ -63,7 +66,10 @@ class AudioAgent(BaseAgent):
         Returns:
             The same state with audio specs attached where applicable.
         """
-        provider = get_provider()
+        provider = get_provider("writing")
+        # The voice slot the admin picked. No speech is synthesised yet, but recording the
+        # choice on the spec means the future TTS step already carries it.
+        voice_slot = resolve_role("voice")
         produced = 0
         for item in state.calendar:
             if item.audio or item.kind not in AUDIO_KINDS:
@@ -77,6 +83,8 @@ class AudioAgent(BaseAgent):
             # for audio/video accessibility.
             spec["transcript"] = script
             spec["status"] = "spec"  # becomes "rendered" once a TTS provider runs it
+            spec["voice_provider"] = voice_slot.provider
+            spec["voice_model"] = voice_slot.model
             item.audio = spec
             produced += 1
 

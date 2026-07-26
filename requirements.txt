@@ -8,9 +8,13 @@ redis>=5.0
 sqlalchemy>=2.0
 alembic>=1.13
 psycopg2-binary>=2.9
+# Text-generation SDKs, one per selectable provider. All three are imported lazily, so a
+# missing package degrades that slot to deterministic fallbacks rather than crashing boot —
+# but they must be installed for the AI Provider board's choices to actually work.
 anthropic>=0.116
-# Image generation only (Claude does not generate images). Unused until IMAGE_PROVIDER is set.
+# Also the only image-generation provider (Claude does not generate images).
 openai>=1.40
+google-genai>=1.0
 python-dotenv>=1.0
 # IANA timezone database. slim container images ship without one, and zoneinfo would then
 # silently fall back to UTC — putting every scheduled post hours off.

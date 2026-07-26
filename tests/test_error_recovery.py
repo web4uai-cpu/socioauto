@@ -208,7 +208,7 @@ class _Stub:
 
 def test_research_retries_with_broader_terms(monkeypatch):
     stub = _Stub([None, {"trends": [], "keywords": [], "hashtags": [], "pain_points": []}])
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     TrendResearchAgent().run(CampaignState(brand_name="Acme", platforms=["x"]))
 
@@ -219,7 +219,7 @@ def test_research_retries_with_broader_terms(monkeypatch):
 
 def test_research_does_not_retry_when_the_first_call_works(monkeypatch):
     stub = _Stub([{"trends": [], "keywords": [], "hashtags": [], "pain_points": []}])
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     TrendResearchAgent().run(CampaignState(brand_name="Acme", platforms=["x"]))
     assert len(stub.prompts) == 1

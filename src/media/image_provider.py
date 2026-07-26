@@ -1,8 +1,9 @@
 """Pluggable image-generation provider used by the Visual Agent.
 
-Mirrors `src/llm/provider.py`: selection is driven by `IMAGE_PROVIDER` / `IMAGE_API_KEY`
-resolved through `src.runtime_config`, so a key entered in the admin dashboard wins over the
-environment. With nothing configured this returns a `NullImageProvider` and the Visual Agent
+Mirrors `src/llm/provider.py`: selection comes from the dashboard's **image slot**
+(`AI_IMAGE_PROVIDER` / `AI_IMAGE_MODEL` plus that provider's key), resolved through the
+shared `src.llm.resolve.resolve_role`, which also honours the older `IMAGE_*` settings.
+With nothing configured this returns a `NullImageProvider` and the Visual Agent
 keeps emitting specs only — the pipeline stays runnable, and every test stays green, without
 live credentials.
 
@@ -17,8 +18,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Protocol
 
+from src.llm.resolve import resolve_role
 from src.logging_config import get_logger
-from src.runtime_config import get_setting
 
 logger = get_logger(__name__)
 
@@ -97,27 +98,27 @@ class OpenAIImageProvider:
 
 @lru_cache(maxsize=1)
 def get_image_provider() -> ImageProvider:
-    """Return the configured provider, or a NullImageProvider when none is set up.
+    """Return the client configured for the image slot, or a NullImageProvider.
 
     Cached so one client is reused across items; call `reset_image_provider()` after changing
     configuration (the settings route does this on every save).
     """
-    provider = get_setting("IMAGE_PROVIDER").lower()
-    api_key = get_setting("IMAGE_API_KEY")
-    model = get_setting("IMAGE_MODEL") or DEFAULT_OPENAI_MODEL
+    config = resolve_role("image")
 
-    if not api_key or provider in ("", "none", "null"):
+    if not config.enabled:
         logger.info("no image provider configured; visuals stay spec-only")
         return NullImageProvider()
 
-    if provider == "openai":
+    if config.provider == "openai":
         try:
-            return OpenAIImageProvider(api_key, model=model)
+            return OpenAIImageProvider(config.api_key, model=config.model or DEFAULT_OPENAI_MODEL)
         except Exception as exc:  # noqa: BLE001 - missing package or bad key must not crash
             logger.error("failed to initialize image provider", extra={"error": str(exc)})
             return NullImageProvider()
 
-    logger.warning("unsupported IMAGE_PROVIDER; staying spec-only", extra={"provider": provider})
+    logger.warning(
+        "no client for image provider; staying spec-only", extra={"provider": config.provider}
+    )
     return NullImageProvider()
 
 

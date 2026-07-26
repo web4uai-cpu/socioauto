@@ -135,7 +135,7 @@ class ContentCreationAgent(BaseAgent):
 
     def run(self, state: CampaignState) -> CampaignState:
         """Draft copy for every item that does not already have a body."""
-        provider = get_provider()
+        provider = get_provider("writing")
         generated = 0
         threaded = 0
         for item in state.calendar:

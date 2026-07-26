@@ -197,7 +197,7 @@ class TrendResearchAgent(BaseAgent):
             f"search for, {MIN_HASHTAGS}-{MAX_HASHTAGS} hashtags, and the audience's main pain "
             "points that this brand can credibly speak to."
         )
-        result = get_provider().complete_json(prompt, RESEARCH_SCHEMA, system=SYSTEM)
+        result = get_provider("research").complete_json(prompt, RESEARCH_SCHEMA, system=SYSTEM)
         if not result:
             return None
         result["trends"] = result.get("trends", [])[:MAX_TRENDS]

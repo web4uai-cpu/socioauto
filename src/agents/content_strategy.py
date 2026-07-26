@@ -79,7 +79,7 @@ class ContentStrategyAgent(BaseAgent):
             "Build a content calendar. Use only the listed platforms and only these trend "
             f"topics. Skip pairings that would not perform on that platform. {kind_rule}"
         )
-        plan = get_provider().complete_json(prompt, CALENDAR_SCHEMA, system=SYSTEM)
+        plan = get_provider("analysis").complete_json(prompt, CALENDAR_SCHEMA, system=SYSTEM)
         if not plan:
             return []
         allowed = set(state.platforms)

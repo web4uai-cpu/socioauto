@@ -18,6 +18,13 @@ import os
 import time
 from dataclasses import dataclass, field
 
+from src.llm.catalog import (
+    PROVIDER_KEY_SETTINGS,
+    PROVIDER_LABELS,
+    ROLE_SPECS,
+    model_setting_key,
+    provider_setting_key,
+)
 from src.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -35,30 +42,71 @@ class SettingSpec:
     is_secret: bool = True
     help_text: str = ""
     choices: tuple[str, ...] = field(default=())
+    # When true, a value outside `choices` is accepted. Model fields set this so a newly
+    # released model id can be entered without waiting on a code change.
+    allow_custom: bool = False
+    # Recommended value, surfaced in the dashboard so an operator can see what an unset
+    # field will fall back to. The fallback itself is applied by the consumer (see
+    # `src.llm.resolve`), not by `get_setting()`, which stays a plain DB/env lookup.
+    default: str = ""
+
+
+def _ai_key_specs() -> tuple[SettingSpec, ...]:
+    """One API key setting per provider in the catalog, shared by every slot using it."""
+    return tuple(
+        SettingSpec(
+            PROVIDER_KEY_SETTINGS[provider],
+            f"{label} API key",
+            "ai_keys",
+            help_text=f"Used by every slot set to '{provider}'.",
+        )
+        for provider, label in PROVIDER_LABELS.items()
+    )
+
+
+def _ai_role_specs() -> tuple[SettingSpec, ...]:
+    """A provider dropdown plus a model field for each workload slot."""
+    specs: list[SettingSpec] = []
+    for role in ROLE_SPECS:
+        providers = tuple(sorted(role.providers))
+        default_model = role.recommended_model(role.default_provider)
+        specs.append(
+            SettingSpec(
+                provider_setting_key(role.role),
+                f"{role.label} provider",
+                "ai_roles",
+                is_secret=False,
+                help_text=role.help_text,
+                choices=("none", *providers),
+                default=role.default_provider,
+            )
+        )
+        specs.append(
+            SettingSpec(
+                model_setting_key(role.role),
+                f"{role.label} model",
+                "ai_roles",
+                is_secret=False,
+                help_text=f"Defaults to {default_model} when blank.",
+                choices=tuple(
+                    sorted({option.id for options in role.providers.values() for option in options})
+                ),
+                allow_custom=True,
+                default=default_model,
+            )
+        )
+    return tuple(specs)
 
 
 SETTING_SPECS: tuple[SettingSpec, ...] = (
-    # --- AI provider ---------------------------------------------------------------
-    SettingSpec(
-        "LLM_PROVIDER",
-        "Provider",
-        "ai",
-        is_secret=False,
-        help_text="Leave as 'none' to run the agents with deterministic fallback copy.",
-        choices=("none", "anthropic"),
-    ),
-    SettingSpec("LLM_API_KEY", "API key", "ai"),
-    SettingSpec(
-        "LLM_MODEL",
-        "Model",
-        "ai",
-        is_secret=False,
-        help_text="Defaults to the latest Claude model when blank.",
-    ),
+    # --- AI provider keys, then one slot per workload --------------------------------
+    *_ai_key_specs(),
+    *_ai_role_specs(),
+    # --- Token cost accounting -------------------------------------------------------
     SettingSpec(
         "LLM_COST_PER_MTOK_INPUT",
         "Input cost per million tokens (USD)",
-        "ai",
+        "ai_costs",
         is_secret=False,
         help_text=(
             "Your contracted rate. Leave blank and reports show exact token counts but no "
@@ -68,34 +116,56 @@ SETTING_SPECS: tuple[SettingSpec, ...] = (
     SettingSpec(
         "LLM_COST_PER_MTOK_OUTPUT",
         "Output cost per million tokens (USD)",
-        "ai",
+        "ai_costs",
         is_secret=False,
         help_text="Your contracted rate. Leave blank to omit dollar costs from reports.",
     ),
-    # --- Image generation ------------------------------------------------------------
+    # --- Legacy single-provider settings ---------------------------------------------
+    # Superseded by the per-slot settings above, but still honoured as a fallback so an
+    # existing deployment keeps working untouched after this upgrade.
+    SettingSpec(
+        "LLM_PROVIDER",
+        "Legacy provider",
+        "ai_legacy",
+        is_secret=False,
+        help_text="Fallback for any slot with no provider of its own.",
+        choices=("none", "anthropic", "openai", "google"),
+    ),
+    SettingSpec(
+        "LLM_API_KEY",
+        "Legacy API key",
+        "ai_legacy",
+        help_text="Fallback for any provider with no key of its own.",
+    ),
+    SettingSpec(
+        "LLM_MODEL",
+        "Legacy model",
+        "ai_legacy",
+        is_secret=False,
+        allow_custom=True,
+        help_text="Fallback for any slot with no model of its own.",
+    ),
     SettingSpec(
         "IMAGE_PROVIDER",
-        "Image provider",
-        "ai",
+        "Legacy image provider",
+        "ai_legacy",
         is_secret=False,
-        help_text=(
-            "Leave as 'none' and the Visual Agent writes image briefs without rendering "
-            "them. Set to 'openai' plus a key to generate real images."
-        ),
+        help_text="Superseded by the image slot above.",
         choices=("none", "openai"),
     ),
     SettingSpec(
         "IMAGE_API_KEY",
-        "Image API key",
-        "ai",
-        help_text="Separate from the LLM key — Claude does not generate images.",
+        "Legacy image API key",
+        "ai_legacy",
+        help_text="Superseded by the OpenAI API key above.",
     ),
     SettingSpec(
         "IMAGE_MODEL",
-        "Image model",
-        "ai",
+        "Legacy image model",
+        "ai_legacy",
         is_secret=False,
-        help_text="Defaults to gpt-image-1 when blank.",
+        allow_custom=True,
+        help_text="Superseded by the image slot above.",
     ),
     # --- Billing -------------------------------------------------------------------
     SettingSpec("STRIPE_SECRET_KEY", "Secret key", "billing"),

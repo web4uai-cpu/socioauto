@@ -67,7 +67,7 @@ def test_llm_report_populates_every_section(monkeypatch):
             "pain_points": ["Too much admin time", "Diagnostic uncertainty"],
         }
     )
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     state = TrendResearchAgent().run(_state())
     research = state.research
@@ -90,7 +90,7 @@ def test_hashtags_are_capped_and_keywords_bounded(monkeypatch):
             "pain_points": [],
         }
     )
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     research = TrendResearchAgent().run(_state()).research
     assert len(research["hashtags"]) == MAX_HASHTAGS

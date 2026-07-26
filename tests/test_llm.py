@@ -67,7 +67,7 @@ def test_content_creation_uses_llm_draft(monkeypatch):
             "cta": "Read the guide",
         }
     )
-    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"])
     state.calendar.append(ContentItem(platform="x", topic="AI in healthcare"))
@@ -83,7 +83,7 @@ def test_content_creation_uses_llm_draft(monkeypatch):
 def test_content_creation_threads_long_posts_on_x(monkeypatch):
     """X supports threads, so overlong copy is split rather than truncated — nothing is lost."""
     stub = StubProvider(payload={"body": "x" * 400, "hashtags": [], "media_brief": "", "cta": ""})
-    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"])
     state.calendar.append(ContentItem(platform="x", topic="long post"))
@@ -101,7 +101,7 @@ def test_content_creation_threads_long_posts_on_x(monkeypatch):
 def test_content_creation_truncates_when_platform_has_no_threads(monkeypatch):
     """Instagram has no thread concept, so the limit is enforced by truncation."""
     stub = StubProvider(payload={"body": "x" * 3000, "hashtags": [], "media_brief": "", "cta": ""})
-    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["instagram"])
     state.calendar.append(ContentItem(platform="instagram", topic="long post"))
@@ -112,7 +112,7 @@ def test_content_creation_truncates_when_platform_has_no_threads(monkeypatch):
 
 
 def test_content_creation_falls_back_when_llm_unavailable(monkeypatch):
-    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda: NullProvider())
+    monkeypatch.setattr("src.agents.content_creation.get_provider", lambda *_: NullProvider())
 
     state = CampaignState(brand_name="Acme", platforms=["x"])
     state.calendar.append(ContentItem(platform="x", topic="fallback topic"))
@@ -130,7 +130,7 @@ def test_trend_research_populates_trends(monkeypatch):
             ]
         }
     )
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"])
     TrendResearchAgent().run(state)
@@ -147,7 +147,7 @@ def test_trend_research_keeps_caller_supplied_trends(monkeypatch):
     stub = StubProvider(
         payload={"trends": [{"topic": "generated"}], "keywords": [], "hashtags": []}
     )
-    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.trend_research.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"], trends=[{"topic": "supplied"}])
     TrendResearchAgent().run(state)
@@ -166,7 +166,7 @@ def test_content_strategy_drops_unknown_platforms(monkeypatch):
             ]
         }
     )
-    monkeypatch.setattr("src.agents.content_strategy.get_provider", lambda: stub)
+    monkeypatch.setattr("src.agents.content_strategy.get_provider", lambda *_: stub)
 
     state = CampaignState(brand_name="Acme", platforms=["x"], trends=[{"topic": "AI triage"}])
     ContentStrategyAgent().run(state)
@@ -175,7 +175,7 @@ def test_content_strategy_drops_unknown_platforms(monkeypatch):
 
 
 def test_content_strategy_falls_back_to_cross_product(monkeypatch):
-    monkeypatch.setattr("src.agents.content_strategy.get_provider", lambda: NullProvider())
+    monkeypatch.setattr("src.agents.content_strategy.get_provider", lambda *_: NullProvider())
 
     state = CampaignState(
         brand_name="Acme",

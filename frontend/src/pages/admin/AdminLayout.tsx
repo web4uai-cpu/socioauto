@@ -5,6 +5,7 @@ import {
   CardIcon,
   ChartIcon,
   PlugIcon,
+  SparkleIcon,
   UsersIcon,
 } from "../../components/ui/Icon";
 
@@ -13,6 +14,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/admin/content", label: "Content", icon: <CalendarIcon className="h-5 w-5" /> },
   { to: "/admin/users", label: "Users", icon: <UsersIcon className="h-5 w-5" /> },
   { to: "/admin/billing", label: "Billing", icon: <CardIcon className="h-5 w-5" /> },
+  { to: "/admin/ai", label: "AI Provider", icon: <SparkleIcon className="h-5 w-5" /> },
   { to: "/admin/integrations", label: "Integrations", icon: <PlugIcon className="h-5 w-5" /> },
 ];
 
@@ -21,6 +23,7 @@ const TITLES: Record<string, { title: string; subtitle: string }> = {
   content: { title: "Content", subtitle: "Calendar and human-in-the-loop review queue" },
   users: { title: "Users", subtitle: "Accounts, roles, and access" },
   billing: { title: "Billing", subtitle: "Subscriptions, invoices, and revenue" },
+  ai: { title: "AI Provider", subtitle: "Pick the best model for each job the agents do" },
   integrations: { title: "Integrations", subtitle: "API keys and third-party connections" },
 };
 

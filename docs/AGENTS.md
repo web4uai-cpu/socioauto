@@ -19,8 +19,33 @@ moderation, and is what campaign creation runs. Visual, video, audio, and SEO de
 **before** moderation so every generated asset is reviewed, not just the copy. Audio runs after
 video so it can voice the script the Video Agent just wrote.
 
-Every LLM-backed agent degrades to a deterministic fallback when no `LLM_API_KEY` is
-configured, so the pipeline stays runnable without credentials.
+Every LLM-backed agent degrades to a deterministic fallback when its slot has no provider or
+no API key, so the pipeline stays runnable without credentials.
+
+## Model slots
+
+Agents do not share one model. Each asks for the **slot** matching its job via
+`get_provider("<role>")` (`src/llm/provider.py`), and an admin picks the provider and model
+per slot under **Admin → AI Provider**. The curated provider/model list lives in
+`src/llm/catalog.py`; resolution (per-slot setting → legacy `LLM_*` → catalog default) lives
+in `src/llm/resolve.py`. Model fields also accept a custom id, so a newly released model does
+not need a code change.
+
+| Slot | Agents on it | Providers |
+| --- | --- | --- |
+| `analysis` | Content Strategy, SEO | anthropic, openai, google |
+| `research` | Trend Research | anthropic, openai, google |
+| `writing` | Content Creation, Engagement, Input Parser, and the spec-writing pass in Visual/Video/Audio | anthropic, openai, google |
+| `image` | Visual (rendering, via `src/media/image_provider.py`) | openai |
+| `voice` | Audio — **config only**; stamped on the spec as `voice_provider`/`voice_model`, no TTS client yet | elevenlabs, openai |
+| `video` | Video — **config only**; stamped on the script as `video_provider`/`video_model`, no render client yet | google, runway, openai |
+
+Moderation, Scheduling, Publishing, and Analytics use no LLM at all — the moderation gate stays
+rule-based and deterministic by design.
+
+Token counts are recorded per model (`src/llm/usage.py`). A run that spanned more than one
+model reports exact token counts but **no** dollar figure, because a single contracted rate
+cannot price it.
 
 ## Post kinds
 

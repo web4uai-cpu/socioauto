@@ -138,7 +138,7 @@ def test_escalated_message_gets_no_draft(monkeypatch):
         def complete_json(self, prompt, schema, *, system="", max_tokens=4096):
             return None
 
-    monkeypatch.setattr("src.agents.engagement.get_provider", lambda: LoudProvider())
+    monkeypatch.setattr("src.agents.engagement.get_provider", lambda *_: LoudProvider())
     draft, escalated = EngagementAgent().draft_reply("I demand a refund")
     assert escalated is True
     assert draft is None
@@ -154,14 +154,14 @@ def test_draft_reply_uses_llm(monkeypatch):
         def complete_json(self, prompt, schema, *, system="", max_tokens=4096):
             return None
 
-    monkeypatch.setattr("src.agents.engagement.get_provider", lambda: StubProvider())
+    monkeypatch.setattr("src.agents.engagement.get_provider", lambda *_: StubProvider())
     draft, escalated = EngagementAgent().draft_reply("Do you ship to Spain?")
     assert escalated is False
     assert draft == "Thanks for reaching out — we ship to Spain!"
 
 
 def test_draft_reply_without_llm_returns_none(monkeypatch):
-    monkeypatch.setattr("src.agents.engagement.get_provider", lambda: NullProvider())
+    monkeypatch.setattr("src.agents.engagement.get_provider", lambda *_: NullProvider())
     draft, escalated = EngagementAgent().draft_reply("Do you ship to Spain?")
     assert draft is None
     assert escalated is False
