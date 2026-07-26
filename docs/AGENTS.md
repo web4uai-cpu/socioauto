@@ -26,7 +26,7 @@ configured, so the pipeline stays runnable without credentials.
 
 `PostKind` (`src/orchestrator/state.py`) decides which generation agents run for an item. The
 caller sets `post_kind` on the request; blank means "decide per platform" via `resolve_kind`
-(TikTok → video, everything else → image).
+(TikTok and both YouTube surfaces → video, everything else → image).
 
 | kind | visual | video | audio |
 |---|---|---|---|
@@ -94,7 +94,8 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Role**: Generate platform-specific copy + media brief for each calendar item.
 - **Constraints**: `PLATFORM_SPECS` holds each platform's character limit, word-count target,
   and editorial style — all fed into the prompt, so LinkedIn and TikTok do not get the same
-  copy. Instagram targets 125-150 words, LinkedIn 150-300.
+  copy. Instagram targets 125-150 words, LinkedIn 150-300, YouTube 100-250 (a search-friendly
+  description), YouTube Shorts 20-60.
 - **Threads**: where a platform supports them (X only), copy that overruns the character limit
   is split by `split_into_thread()` into numbered `1/n` parts rather than truncated — losing
   the end of a post is worse than posting it in two parts. Continuations go in `item.thread`;
@@ -111,7 +112,8 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Failure is non-fatal**: a failing image API leaves the spec in place and the campaign
   continues — an unavailable image service must never cost the user their copy.
 - **Platform logic**: native aspect ratio/size per platform (`PLATFORM_VISUAL_SPEC`) —
-  Instagram 4:5, TikTok 9:16, X 16:9, LinkedIn/Facebook 1.91:1.
+  Instagram 4:5, TikTok 9:16, X 16:9, LinkedIn/Facebook 1.91:1, YouTube 16:9,
+  YouTube Shorts 9:16.
 - **Output schema**: `item.visual = {prompt, alt_text, overlay_text, style, aspect_ratio,
   size, status, source}` — `status` is `"spec"` until a renderer runs.
 - **Guardrail**: prompts must not depict real identifiable people or unprovided logos.
@@ -120,7 +122,8 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **File**: `src/agents/video.py`
 - **Role**: Writes a short-form video script and thumbnail prompt.
 - **Scope**: only runs for platforms with a native short-form surface (`VIDEO_PLATFORMS`:
-  TikTok/Instagram 30s, Facebook/X 45s). LinkedIn is skipped by default. Items on other
+  TikTok/Instagram 30s, Facebook/X 45s, YouTube 300s, YouTube Shorts 50s). LinkedIn is skipped
+  by default. Items on other
   platforms keep `video == {}`.
 - **Output schema**: `item.video = {hook, scenes[{narration, visual, seconds}],
   call_to_action, thumbnail_prompt, thumbnail_text, target_seconds, status, source}`
@@ -145,7 +148,8 @@ progress hook is logged and swallowed — telemetry never takes a campaign down.
 - **Role**: Optimizes for search/discovery and lead generation. Runs last in the generation
   chain so it can see the final copy, visual, and video.
 - **Also mutates**: merges its hashtags into `item.hashtags`, dedupes, and caps to the
-  platform limit (`PLATFORM_HASHTAG_LIMIT`: Instagram 12, TikTok 6, LinkedIn 5, X/Facebook 3).
+  platform limit (`PLATFORM_HASHTAG_LIMIT`: Instagram 20, YouTube 15, TikTok 6, LinkedIn 5,
+  YouTube Shorts 5, X/Facebook 3).
 - **Output schema**: `item.seo = {primary_keyword, keywords[], meta_description (≤155),
   slug, lead_magnet, lead_form_fields[], lead_cta, readability, readability_label, score,
   passed_checks[], suggestions[], source}`

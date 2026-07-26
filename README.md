@@ -2,7 +2,7 @@
 
 An 8-agent AI system that automates social media content strategy, creation, scheduling,
 publishing, engagement, moderation, analytics, and trend research across platforms
-(X/Twitter, Instagram, LinkedIn, TikTok, Facebook).
+(X/Twitter, Instagram, LinkedIn, TikTok, Facebook, YouTube, YouTube Shorts).
 
 ## Architecture
 
@@ -32,7 +32,8 @@ scaling strategy, and [docs/AGENTS.md](docs/AGENTS.md) for each agent's prompt/s
 - **Storage**: PostgreSQL (metadata), S3-compatible bucket (media assets)
 - **LLM**: Pluggable provider interface (`src/llm/provider.py`) — Anthropic (Claude), with a
   deterministic no-LLM fallback so the pipeline runs without credentials
-- **Platform APIs**: X API v2, Meta Graph API, LinkedIn API, TikTok Content API
+- **Platform APIs**: X API v2, Meta Graph API, LinkedIn API, TikTok Content API,
+  YouTube Data API v3
 - **Billing**: Stripe Checkout + signature-verified webhook sync (`src/billing/`)
 - **Configuration**: integration keys are settable from the admin dashboard and stored
   AES-256-GCM encrypted (`src/runtime_config.py`), overriding environment variables
@@ -126,7 +127,9 @@ alembic revision --autogenerate -m "..."  # after changing models.py
 `GET /api/v1/accounts/{platform}/authorize` returns the provider consent URL; the provider
 redirects back to `GET /api/v1/accounts/{platform}/callback`, which exchanges the code and
 stores only the AES-256-GCM-encrypted token bundle. Supported: `x`, `linkedin`, `facebook`,
-`instagram`, `tiktok` (see [src/platforms/oauth/](src/platforms/oauth/)). Inbound
+`instagram`, `tiktok`, `youtube`, `youtube_shorts` (see
+[src/platforms/oauth/](src/platforms/oauth/); both YouTube keys share one Google OAuth client).
+Inbound
 mentions/DMs arrive via signature-verified webhooks (`/webhooks/meta`, `/webhooks/x`).
 
 ## Auto-Scheduling

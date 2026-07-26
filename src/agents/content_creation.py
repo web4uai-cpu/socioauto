@@ -57,6 +57,16 @@ PLATFORM_SPECS: dict[str, PlatformSpec] = {
         "Casual and fast. Front-load the hook; the caption supports the video.",
         word_range=(20, 60),
     ),
+    "youtube": PlatformSpec(
+        5000,
+        "Search-friendly description. Open with what the video delivers, then detail and links.",
+        word_range=(100, 250),
+    ),
+    "youtube_shorts": PlatformSpec(
+        5000,
+        "Short and hook-first. One line that makes the viewer stay past the first second.",
+        word_range=(20, 60),
+    ),
 }
 DEFAULT_SPEC = PlatformSpec(280, "Clear and concise.")
 

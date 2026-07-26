@@ -74,6 +74,12 @@ def test_visual_agent_uses_platform_native_aspect_ratio():
     assert state.calendar[1].visual["aspect_ratio"] == PLATFORM_VISUAL_SPEC["x"][0]
 
 
+def test_youtube_surfaces_have_opposite_orientations():
+    # Long-form renders a landscape thumbnail; Shorts is a vertical frame.
+    assert PLATFORM_VISUAL_SPEC["youtube"][0] == "16:9"
+    assert PLATFORM_VISUAL_SPEC["youtube_shorts"][0] == "9:16"
+
+
 def test_visual_agent_always_produces_prompt_and_alt_text():
     state = _state()
     state.calendar = [ContentItem(platform="x", topic="Launch day", media_brief="a rocket")]

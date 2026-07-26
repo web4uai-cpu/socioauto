@@ -192,6 +192,11 @@ def test_instagram_allows_a_dense_hashtag_set():
     assert PLATFORM_HASHTAG_LIMIT["x"] <= 3  # stuffing X costs reach
 
 
+def test_youtube_tags_are_denser_than_shorts():
+    # YouTube description tags feed search; Shorts is a feed surface and needs far fewer.
+    assert PLATFORM_HASHTAG_LIMIT["youtube"] > PLATFORM_HASHTAG_LIMIT["youtube_shorts"]
+
+
 def test_lead_capture_suggestion_is_present():
     item = ContentItem(platform="x", topic="Demo", body="Book a demo.", goal="conversion")
     SEOAgent().run(_state(item))

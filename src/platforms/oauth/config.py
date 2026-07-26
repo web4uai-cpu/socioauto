@@ -64,4 +64,33 @@ PLATFORM_OAUTH: dict[str, OAuthConfig] = {
         client_id_env="TIKTOK_CLIENT_KEY",
         client_secret_env="TIKTOK_CLIENT_SECRET",
     ),
+    # YouTube long-form and Shorts are the same Google account and the same OAuth app; they are
+    # separate platform keys only so content/scheduling specs can differ.
+    "youtube": OAuthConfig(
+        platform="youtube",
+        authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
+        token_url="https://oauth2.googleapis.com/token",
+        scopes=[
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.readonly",
+        ],
+        client_id_env="YOUTUBE_CLIENT_ID",
+        client_secret_env="YOUTUBE_CLIENT_SECRET",
+        use_pkce=True,
+        # Google only issues a refresh token when both of these are present on the consent URL.
+        extra_authorize_params={"access_type": "offline", "prompt": "consent"},
+    ),
+    "youtube_shorts": OAuthConfig(
+        platform="youtube_shorts",
+        authorize_url="https://accounts.google.com/o/oauth2/v2/auth",
+        token_url="https://oauth2.googleapis.com/token",
+        scopes=[
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.readonly",
+        ],
+        client_id_env="YOUTUBE_CLIENT_ID",
+        client_secret_env="YOUTUBE_CLIENT_SECRET",
+        use_pkce=True,
+        extra_authorize_params={"access_type": "offline", "prompt": "consent"},
+    ),
 }

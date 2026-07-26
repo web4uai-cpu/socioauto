@@ -99,7 +99,7 @@ Sign in as an `ADMIN_EMAILS` account and open **Integrations** to set:
   emit deterministic placeholder copy rather than generated content.
 - **Billing** — Stripe secret key, webhook signing secret, and the four price IDs.
 - **Social platforms** — OAuth client IDs/secrets and webhook secrets for X, Meta,
-  LinkedIn, TikTok.
+  LinkedIn, TikTok, YouTube.
 
 Each field shows whether its current value comes from the database or the environment.
 

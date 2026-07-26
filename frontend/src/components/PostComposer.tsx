@@ -14,6 +14,8 @@ const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn", tone: "from-brand-500 to-brand-700" },
   { id: "facebook", label: "Facebook", tone: "from-brand-400 to-brand-600" },
   { id: "tiktok", label: "TikTok", tone: "from-teal-400 to-slate-800" },
+  { id: "youtube", label: "YouTube", tone: "from-red-500 to-red-700" },
+  { id: "youtube_shorts", label: "YouTube Shorts", tone: "from-rose-400 to-red-600" },
 ];
 
 /** What gets generated for each kind — mirrors the agent gating in the backend. */

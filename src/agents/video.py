@@ -17,6 +17,8 @@ VIDEO_PLATFORMS: dict[str, int] = {
     "instagram": 30,  # Reels
     "facebook": 45,
     "x": 45,
+    "youtube": 300,
+    "youtube_shorts": 50,  # Shorts are capped at 60s; leave headroom for the outro.
 }
 # Used when the caller asks for video on a platform without a tuned short-form runtime
 # (LinkedIn, say) — an explicit request is honoured rather than silently dropped.

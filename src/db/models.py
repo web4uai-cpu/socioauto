@@ -78,7 +78,8 @@ class SocialAccount(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "platform IN ('x','instagram','linkedin','tiktok','facebook')",
+            "platform IN ('x','instagram','linkedin','tiktok','facebook',"
+            "'youtube','youtube_shorts')",
             name="ck_social_accounts_platform",
         ),
     )

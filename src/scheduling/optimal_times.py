@@ -32,6 +32,9 @@ _OPTIMAL_HOURS: dict[str, list[int]] = {
     # Not specified in the workflow doc; these follow the same evening-skew heuristic.
     "facebook": [9, 13, 15, 19],
     "tiktok": [12, 16, 18, 20],
+    # Afternoon/evening skew — long-form watch sessions start after work.
+    "youtube": [14, 16, 17, 20],
+    "youtube_shorts": [12, 15, 18, 21],
 }
 _DEFAULT_HOURS = [9, 12, 15, 18]
 _WEEKDAY_ONLY = {"linkedin"}

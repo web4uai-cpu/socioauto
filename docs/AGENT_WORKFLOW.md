@@ -145,6 +145,12 @@ length target and editorial style for each platform, both fed into the drafting 
 | LinkedIn | 3000 | 150-300 ✅ spec | professional, insight-led | – |
 | Facebook | 5000 | 80-160 | community-focused, invites replies | – |
 | TikTok | 2200 | 20-60 | casual, front-loaded hook | – |
+| YouTube | 5000 | 100-250 | search-friendly description | – |
+| YouTube Shorts | 5000 | 20-60 | short, hook-first | – |
+
+For both YouTube surfaces the description is `item.body`; `snippet.title` is derived from the
+first line of the body and truncated to YouTube's 100-character title limit on a word boundary
+(`_derive_title` in [clients.py](../src/platforms/clients.py)).
 
 **Thread option (X)** — `split_into_thread()` splits overlong copy on sentence boundaries into
 numbered parts (`1/n`), each within the limit, capped at `MAX_THREAD_PARTS`. Continuation parts
@@ -154,18 +160,23 @@ replaced blanket truncation, which silently discarded the end of every long post
 ### Hashtag counts
 
 `PLATFORM_HASHTAG_LIMIT` in [seo.py](../src/agents/seo.py): Instagram 20 (spec's 15-20 range),
-TikTok 6, LinkedIn 5, X 3, Facebook 3. Instagram rewards a dense tag set; the others do not,
-and stuffing them costs reach.
+TikTok 6, LinkedIn 5, X 3, Facebook 3, YouTube 15, YouTube Shorts 5. Instagram rewards a dense
+tag set and YouTube indexes description tags for search; the others do not, and stuffing them
+costs reach.
 
 ### Caveats against the spec's numbers
 
 - **Image sizes** now match the spec exactly: Instagram 1080x1350 (4:5), X 1200x675 (16:9),
-  LinkedIn 1200x627. `PLATFORM_VISUAL_SPEC` in `visual.py`.
-- **YouTube is not a supported platform.** There is no 60-second YouTube script, and adding one
-  is not just a runtime entry: `RestPlatformClient` raises `PlatformHttpError` for any platform
-  without a configured endpoint, so YouTube would need a Data API client plus its OAuth flow
-  before a script could ever be published. TikTok is 30s as specified; Instagram 30s,
-  Facebook/X 45s.
+  LinkedIn 1200x627, YouTube 1280x720 (16:9), YouTube Shorts 1080x1920 (9:16).
+  `PLATFORM_VISUAL_SPEC` in `visual.py`.
+- **Video runtimes**: TikTok is 30s as specified; Instagram 30s, Facebook/X 45s, YouTube 300s,
+  YouTube Shorts 50s (under the 60s Shorts ceiling, with headroom for an outro).
+- **YouTube publishes metadata only.** `youtube` and `youtube_shorts` have Data API v3 endpoints
+  and a Google OAuth flow, but — like every other platform here — `RestPlatformClient` sends the
+  post payload and never the media bytes. A live publish would create a video resource without a
+  file. Closing that needs multipart/resumable support in `http_client.request_json` (JSON-only
+  today), a media parameter threaded through `publish_post` → `deliver`, and a lift of
+  `LocalMediaStorage`'s 50 MB in-memory cap.
 - **Agents run sequentially, not in parallel.**
 
 ### Phase 4: REVIEW & APPROVAL (User-dependent)
@@ -239,6 +250,8 @@ the scheduler and DB stay in UTC.
 | Instagram | 11 AM-1 PM, 7 PM-9 PM |
 | LinkedIn | 8-10 AM, 12-2 PM (weekdays only) |
 | X | 9 AM, 12 PM, 3 PM, 6 PM |
+| YouTube | 2 PM, 4-5 PM, 8 PM |
+| YouTube Shorts | 12 PM, 3 PM, 6 PM, 9 PM |
 
 Default timezone is **`Asia/Kolkata`** (IST); override per campaign with `timezone` on the
 create request. Note IST is UTC+05:30, so an on-the-hour local slot is stored on the half hour
@@ -258,7 +271,7 @@ the publisher runs in **simulate** mode and returns a synthetic `…-sim-…` id
 
 **Post IDs and URLs are captured.** `external_post_id` always; `external_post_url` via
 `build_post_url()` for platforms whose id maps onto a public permalink (X, LinkedIn, Facebook,
-TikTok). It returns `None` — deliberately, rather than a plausible-looking dead link — for:
+TikTok, and both YouTube surfaces). It returns `None` — deliberately, rather than a plausible-looking dead link — for:
 - **simulated posts**, which do not exist;
 - **Instagram**, whose Graph API media id is *not* the `/p/<shortcode>` used in permalinks.
   Instagram returns a `permalink` field on the media object; capturing that is the correct fix
@@ -452,7 +465,7 @@ flowchart TD
     MOD -->|rejected| REV[Needs revision]
     RQ -->|Human Approval| SCH[Scheduling Agent]
     SCH --> PUB[Publishing Agent]
-    PUB --> PLATFORMS[Instagram / X / LinkedIn / Facebook / TikTok]
+    PUB --> PLATFORMS[Instagram / X / LinkedIn / Facebook / TikTok / YouTube / Shorts]
     PLATFORMS --> ENG[Engagement Agent]
     ENG --> ANL[Analytics Agent]
     ANL --> FIN[Financial Agent - not implemented]

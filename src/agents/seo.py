@@ -24,6 +24,9 @@ PLATFORM_HASHTAG_LIMIT: dict[str, int] = {
     "x": 3,
     "linkedin": 5,
     "facebook": 3,
+    # YouTube indexes description tags for search; Shorts surfaces on the feed, not search.
+    "youtube": 15,
+    "youtube_shorts": 5,
 }
 DEFAULT_HASHTAG_LIMIT = 5
 META_DESCRIPTION_LIMIT = 155

@@ -33,6 +33,9 @@ PLATFORM_VISUAL_SPEC: dict[str, tuple[str, str]] = {
     "x": ("16:9", "1200x675"),
     "linkedin": ("1.91:1", "1200x627"),
     "facebook": ("1.91:1", "1200x630"),
+    # Long-form YouTube uses a landscape thumbnail; Shorts is a vertical frame.
+    "youtube": ("16:9", "1280x720"),
+    "youtube_shorts": ("9:16", "1080x1920"),
 }
 DEFAULT_SPEC = ("1:1", "1080x1080")
 

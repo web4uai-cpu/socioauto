@@ -36,6 +36,8 @@ def _local(slot: datetime, tz) -> datetime:
         ("instagram", [11, 12, 19, 20]),  # 11 AM-1 PM, 7 PM-9 PM
         ("linkedin", [8, 9, 12, 13]),  # 8-10 AM, 12-2 PM
         ("x", [9, 12, 15, 18]),  # 9 AM, 12 PM, 3 PM, 6 PM
+        ("youtube", [14, 16, 17, 20]),  # afternoon/evening watch sessions
+        ("youtube_shorts", [12, 15, 18, 21]),
     ],
 )
 def test_windows_match_the_workflow_spec(platform, expected):

@@ -120,6 +120,14 @@ SETTING_SPECS: tuple[SettingSpec, ...] = (
     SettingSpec("LINKEDIN_CLIENT_SECRET", "LinkedIn client secret", "platforms"),
     SettingSpec("TIKTOK_CLIENT_KEY", "TikTok client key", "platforms", is_secret=False),
     SettingSpec("TIKTOK_CLIENT_SECRET", "TikTok client secret", "platforms"),
+    SettingSpec(
+        "YOUTUBE_CLIENT_ID",
+        "YouTube client id",
+        "platforms",
+        is_secret=False,
+        help_text="Google Cloud OAuth client; covers both YouTube and YouTube Shorts.",
+    ),
+    SettingSpec("YOUTUBE_CLIENT_SECRET", "YouTube client secret", "platforms"),
     # --- URLs ----------------------------------------------------------------------
     SettingSpec(
         "APP_BASE_URL",

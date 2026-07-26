@@ -59,7 +59,8 @@ CREATE TABLE brands (
 CREATE TABLE platform_accounts (
     id UUID PRIMARY KEY,
     brand_id UUID REFERENCES brands(id),
-    platform TEXT CHECK (platform IN ('x','instagram','linkedin','tiktok','facebook')),
+    platform TEXT CHECK (platform IN ('x','instagram','linkedin','tiktok','facebook',
+                                      'youtube','youtube_shorts')),
     credentials_ref TEXT NOT NULL, -- pointer into secrets manager, never raw secret
     rate_limit_window JSONB
 );

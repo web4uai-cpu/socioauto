@@ -15,7 +15,8 @@ OPTIONAL_POST_KIND_PATTERN = "^(text|image|video|audio|faceless_video)?$"
 
 class CampaignCreateRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
-    platforms: list[str] = ["instagram", "twitter", "linkedin"]
+    # "x" — not "twitter"; the latter is not a configured client key and would fail at publish.
+    platforms: list[str] = ["instagram", "x", "linkedin"]
     tone: str = "professional"
     cta: str | None = None
     target_audience: str | None = None
@@ -154,7 +155,7 @@ class AnalyticsDashboardResponse(BaseModel):
 
 
 class AccountConnectRequest(BaseModel):
-    platform: str = Field(pattern="^(x|instagram|linkedin|tiktok|facebook)$")
+    platform: str = Field(pattern="^(x|instagram|linkedin|tiktok|facebook|youtube_shorts|youtube)$")
     external_account_id: str = Field(min_length=1, max_length=255)
     display_name: str | None = None
     api_key: str = Field(min_length=1, description="Raw platform API key/token; never stored as-is")

@@ -58,7 +58,40 @@ _ENDPOINTS: dict[str, _Endpoint] = {
         "https://open.tiktokapis.com/v2/post/publish/content/init/",
         "https://open.tiktokapis.com/v2/video/query/",
     ),
+    # YouTube long-form and Shorts share the Data API v3 videos resource; they differ only in
+    # the shape of the media (16:9 vs 9:16) and the runtime, which the generation agents handle.
+    "youtube": _Endpoint(
+        "https://www.googleapis.com/youtube/v3/videos?part=snippet,status",
+        "https://www.googleapis.com/youtube/v3/videos?part=statistics&id={id}",
+    ),
+    "youtube_shorts": _Endpoint(
+        "https://www.googleapis.com/youtube/v3/videos?part=snippet,status",
+        "https://www.googleapis.com/youtube/v3/videos?part=statistics&id={id}",
+    ),
 }
+
+# Platforms served by the YouTube Data API, which needs a nested snippet payload and returns
+# metrics wrapped in an `items` envelope.
+_YOUTUBE_PLATFORMS = frozenset({"youtube", "youtube_shorts"})
+# YouTube rejects a snippet.title longer than this.
+_YOUTUBE_TITLE_LIMIT = 100
+# "People & Blogs" — the safest default when the caller expresses no category.
+_YOUTUBE_CATEGORY_ID = "22"
+
+
+def _derive_title(body: str) -> str:
+    """Derive a YouTube video title from the post body.
+
+    ContentItem carries a single ``body``; YouTube needs a separate title. Take the first
+    non-empty line and truncate on a word boundary so the title never ends mid-word.
+    """
+    first_line = next((line.strip() for line in body.splitlines() if line.strip()), "")
+    title = " ".join(first_line.split())
+    if len(title) <= _YOUTUBE_TITLE_LIMIT:
+        return title
+    clipped = title[:_YOUTUBE_TITLE_LIMIT]
+    head, sep, _ = clipped.rpartition(" ")
+    return (head if sep else clipped).rstrip()
 
 
 # Permalink templates for platforms whose post id maps directly onto a public URL.
@@ -71,6 +104,9 @@ _PERMALINKS: dict[str, str] = {
     "linkedin": "https://www.linkedin.com/feed/update/{id}",
     "facebook": "https://www.facebook.com/{id}",
     "tiktok": "https://www.tiktok.com/video/{id}",
+    # Both YouTube surfaces return a real video id, so a permalink can be built directly.
+    "youtube": "https://www.youtube.com/watch?v={id}",
+    "youtube_shorts": "https://www.youtube.com/shorts/{id}",
 }
 # Marker used by simulate-mode ids; those posts do not exist, so they get no URL.
 _SIMULATED = "-sim-"
@@ -102,6 +138,15 @@ class RestPlatformClient:
             return {"text": body}
         if self.platform in ("facebook", "instagram"):
             return {"message": body}
+        if self.platform in _YOUTUBE_PLATFORMS:
+            return {
+                "snippet": {
+                    "title": _derive_title(body),
+                    "description": body,
+                    "categoryId": _YOUTUBE_CATEGORY_ID,
+                },
+                "status": {"privacyStatus": "public"},
+            }
         # LinkedIn/TikTok accept a message-like field; kept generic for the scaffold.
         return {"text": body}
 
@@ -144,7 +189,13 @@ class RestPlatformClient:
                 headers={"Authorization": f"Bearer {access_token}"},
             )
 
-        return get_breaker(self.platform).call(_do)
+        payload = get_breaker(self.platform).call(_do)
+        if self.platform in _YOUTUBE_PLATFORMS:
+            # v3 wraps results in an `items` envelope; flatten so callers see a plain dict
+            # like every other platform returns.
+            items = payload.get("items") or []
+            return items[0].get("statistics", {}) if items else {}
+        return payload
 
 
 def get_client(platform: str) -> RestPlatformClient:

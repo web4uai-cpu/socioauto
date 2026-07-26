@@ -7,8 +7,11 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from src.api.main import app
+from src.api.schemas import AccountConnectRequest
+from src.orchestrator.state import PostKind, resolve_kind
 from src.platforms import clients, http_client
 from src.platforms.circuit_breaker import CircuitBreaker, CircuitOpenError
 from src.platforms.http_client import PlatformHttpError
@@ -43,6 +46,73 @@ def test_publish_real_path_uses_request_json(monkeypatch):
     assert captured["url"] == "https://api.twitter.com/2/tweets"
     assert captured["auth"] == "Bearer tok"
     assert captured["payload"] == {"text": "launch day"}
+
+
+# --- YouTube / YouTube Shorts ------------------------------------------------------------
+
+
+def test_youtube_publish_builds_snippet_payload(monkeypatch):
+    captured = {}
+
+    def _fake_request_json(method, url, *, headers=None, params=None, data=None, json=None):
+        captured["url"] = url
+        captured["payload"] = json
+        return {"id": "vid123"}
+
+    monkeypatch.setattr(clients, "request_json", _fake_request_json)
+    external_id = clients.get_client("youtube").publish("Launch day\n\nDetails.", access_token="t")
+
+    assert external_id == "vid123"
+    assert captured["url"] == "https://www.googleapis.com/youtube/v3/videos?part=snippet,status"
+    assert captured["payload"]["snippet"]["title"] == "Launch day"
+    assert captured["payload"]["snippet"]["description"] == "Launch day\n\nDetails."
+    assert captured["payload"]["status"]["privacyStatus"] == "public"
+
+
+def test_youtube_title_is_truncated_on_a_word_boundary():
+    body = " ".join(["word"] * 40)  # 199 chars, far over the 100-char title limit
+    title = clients._derive_title(body)
+    assert len(title) <= 100
+    assert not title.endswith("wor")  # never cut mid-word
+    assert title == " ".join(["word"] * 20)
+
+
+def test_youtube_metrics_are_flattened_from_the_items_envelope(monkeypatch):
+    def _fake_request_json(method, url, *, headers=None, params=None, data=None, json=None):
+        assert "id=vid123" in url
+        return {"items": [{"statistics": {"viewCount": "42", "likeCount": "7"}}]}
+
+    monkeypatch.setattr(clients, "request_json", _fake_request_json)
+    metrics = clients.get_client("youtube").fetch_metrics("vid123", access_token="t")
+    assert metrics == {"viewCount": "42", "likeCount": "7"}
+
+
+def test_youtube_permalinks_differ_between_surfaces():
+    assert clients.build_post_url("youtube", "abc") == "https://www.youtube.com/watch?v=abc"
+    assert clients.build_post_url("youtube_shorts", "abc") == "https://www.youtube.com/shorts/abc"
+
+
+def test_youtube_simulate_mode_has_no_permalink():
+    external_id = http_client.publish_post("youtube_shorts", "hello")
+    assert external_id.startswith("youtube_shorts-sim-")
+    # A simulated post does not exist, so no URL should be invented for it.
+    assert clients.build_post_url("youtube_shorts", external_id) is None
+
+
+@pytest.mark.parametrize("platform", ["youtube", "youtube_shorts"])
+def test_youtube_platforms_default_to_video(platform):
+    assert resolve_kind(None, platform) is PostKind.VIDEO
+
+
+@pytest.mark.parametrize("platform", ["youtube", "youtube_shorts"])
+def test_account_connect_schema_accepts_youtube(platform):
+    req = AccountConnectRequest(platform=platform, external_account_id="chan-1", api_key="k")
+    assert req.platform == platform
+
+
+def test_account_connect_schema_still_rejects_unknown_platform():
+    with pytest.raises(ValidationError):
+        AccountConnectRequest(platform="myspace", external_account_id="1", api_key="k")
 
 
 def test_circuit_breaker_opens_after_threshold():

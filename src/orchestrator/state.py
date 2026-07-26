@@ -39,9 +39,13 @@ VISUAL_KINDS = frozenset({PostKind.IMAGE, PostKind.VIDEO, PostKind.AUDIO, PostKi
 VIDEO_KINDS = frozenset({PostKind.VIDEO, PostKind.FACELESS_VIDEO})
 AUDIO_KINDS = frozenset({PostKind.AUDIO, PostKind.VIDEO, PostKind.FACELESS_VIDEO})
 
-# What a platform gets when the caller expressed no preference. Keeps prior behaviour:
-# TikTok is a video-first surface, everything else defaults to an image post.
-DEFAULT_KIND_BY_PLATFORM: dict[str, PostKind] = {"tiktok": PostKind.VIDEO}
+# What a platform gets when the caller expressed no preference. TikTok and both YouTube
+# surfaces are video-first; everything else defaults to an image post.
+DEFAULT_KIND_BY_PLATFORM: dict[str, PostKind] = {
+    "tiktok": PostKind.VIDEO,
+    "youtube": PostKind.VIDEO,
+    "youtube_shorts": PostKind.VIDEO,
+}
 FALLBACK_KIND = PostKind.IMAGE
 
 
